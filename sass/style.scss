@@ -1,0 +1,106 @@
+$color0: #0B1334;
+$color1: #9D4466;
+$color2: #5C5C98;
+$color3: #B6619B;
+$color4: #728FBF;
+$color5: #AEA2CE;
+$color6: #F1AADC;
+$color7: #f2dfef;
+$color8: #a99ca7;
+
+body {
+    background: $color0;    
+    font-family: 'Inconsolata', monospace;
+    font-size: 16pt;
+    color: $color7;
+}
+
+.header {
+    font-family: 'Inconsolata', monospace;
+    display: flex;
+    justify-content: center;
+}
+.header ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+.header li {
+    float: left;
+}
+.header li a {
+    display: block;
+    padding: 1rem;
+    color: white;
+    text-align: center;
+    background-color: $color0;
+    color: $color3;
+    padding: 14px 16px;
+    text-decoration: none;
+}
+.header li a:hover {
+    background-color: $color3;
+    color: $color0;
+}
+
+.container {
+    background: $color1;
+    color: $color0;
+    width: 69rem;
+    margin: auto;
+    padding: 3rem;
+}
+
+.container .title {
+    text-align: center;
+    font-size: 32pt;
+}
+
+
+.container h1 {
+    text-decoration: underline;
+}
+
+.container li {
+    list-style-type: none;
+    padding: 1rem;
+}
+
+.container a:link, a:visited {
+    color: $color0;
+}
+
+.container a:hover {
+    color: $color3;
+}
+
+//// Code block styling
+// syntax highlighting
+pre {
+  padding: 1rem;
+  overflow: auto;
+}
+// The line numbers already provide some kind of left/right padding
+pre[data-linenos] {
+  padding: 1rem 0;
+}
+pre table td {
+  padding: 0;
+}
+// The line number cells
+pre table td:nth-of-type(1) {
+  text-align: center;
+  user-select: none;
+}
+pre mark {
+  // If you want your highlights to take the full width.
+  display: block;
+  // The default background colour of a mark is bright yellow
+  background-color: rgba(254, 252, 232, 0.9);
+}
+pre table {
+  width: 100%;
+  border-collapse: collapse;
+}
+  
