@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="title">
+    {{ section.title }}
+</h1>
+
+<p>
+    These are all my writeups for the pwn bootcamp run by the Texas A&M Cybersecurity Club. I might add detailed explanations later, but this is mostly a quick reference for copy-pasting into future solve scripts, so it assumes basic knowledge of what you're supposed to be doing.
+</p>
+
+{% for page in section.pages %}
+<div class="post">
+    <h1><a href="{{ page.permalink | safe }}">{{ page.title }}</a></h1>
+    <p>{{ page.description | safe}}</p>
+</div>
+{% endfor %}
+{% endblock content %}
