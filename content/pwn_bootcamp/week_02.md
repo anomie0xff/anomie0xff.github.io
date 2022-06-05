@@ -2,7 +2,7 @@
 title = "Week 02"
 weight = 1
 slug="week-02"
-description = "ROPchain modify registers and call function, use leaked system address to call system('/bin/sh'), leak libc using puts and call system('/bin/sh')"
+description = "- args: ROPchain modify registers and call function<br>- leaked: use leaked system address to call system('/bin/sh')<br>- leakme: leak libc using puts and call system('/bin/sh')"
 +++
 
 # args

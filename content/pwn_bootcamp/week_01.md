@@ -2,7 +2,7 @@
 title = "Week 01"
 weight = 0
 slug="week-01"
-description = "Buffer overflow overwrite variable, bof overwrite RIP, bof jump to shellcode at leaked stack address"
+description = "- Flag Hole: buffer overflow overwrite variable<br>- Login: bof overwrite RIP<br>- Sally: bof jump to shellcode at leaked stack address"
 +++
 
 # Flag Hole
