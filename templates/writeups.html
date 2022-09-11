@@ -7,6 +7,7 @@
 {% for page in section.pages %}
 <div class="post">
     <h1><a href="{{ page.permalink | safe }}">{{ page.title }}</a></h1>
+    <h4>{{ page.date }}</h4>
     <p>{{ page.description | safe}}</p>
 </div>
 {% endfor %}
