@@ -24,7 +24,7 @@ Here, I am going to skip over hours of struggle learning about fixing biased dat
 
 At some point I had an epiphany: on a true-false quiz, if you answer all the questions, it is equally as hard to get 0% right as it is to get 100% right. So going back to the original model, we can just flip the labels in y for each image, train it, and send it in. This time, it performs phenomenally well, and we get the flag.
 
-Final solve notebook and model [here](assets/solve.ipynb)
+Final solve notebook and model [here](solve.ipynb)
 
 `flag{!ts_r4In!Ng_C47$_AnD_D09z!}`
 
@@ -221,7 +221,7 @@ There was no consistent flag format for this CTF, but we had a flag from a diffe
 
 Side note: I don't know if I just missed it or if they added it after I solved it but I did not see the all caps NOT in the challenge description. Probably would have saved me some time.
 
-solve script [here](assets/transform.py)
+solve script [here](transform.py)
 ```py
 ct = 'wxqvn$Zae${deyZv$d"i'
 
@@ -325,7 +325,7 @@ Honestly not too bad, didn't take too much troubleshooting since I just assumed 
 
 The part that took me the most debugging time was actually figuring out how to get output from the script, which I eventually got to work by simple turning on debug log level in pwntools. I assume the normal output was breaking because of how Windows does carriage returns then newlines.
 
-Solve script (download [here](assets/babywindows_solve.py)):
+Solve script (download [here](babywindows_solve.py)):
 ```py
 from pwn import *
 
