@@ -11,7 +11,7 @@ $color8: #8a8c87;
 body {
     background: $color0;    
     font-family: 'Inconsolata', monospace;
-    font-size: 16pt;
+    font-size: 12pt;
     color: $color7;
 }
 
@@ -31,7 +31,6 @@ body {
 }
 .header li a {
     display: block;
-    padding: 1rem;
     color: white;
     text-align: center;
     background-color: $color0;
@@ -54,7 +53,7 @@ body {
 
 .container .title {
     text-align: center;
-    font-size: 32pt;
+    font-size: 24pt;
 }
 
 

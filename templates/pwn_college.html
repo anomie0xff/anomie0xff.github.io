@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="title">
+    {{ section.title }}
+</h1>
+
+<p>
+    Various writeups for various challenges from pwn.college
+</p>
+
+{% for page in section.pages %}
+<div class="post">
+    <h1><a href="{{ page.permalink | safe }}">{{ page.title }}</a></h1>
+    <p>{{ page.description | safe}}</p>
+</div>
+{% endfor %}
+{% endblock content %}
