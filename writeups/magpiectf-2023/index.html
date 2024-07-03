@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>anomie0xff</title>
+    <link rel="stylesheet" href="https://anomie0xff.github.io/style.css">
+</head>
+
+<body>
+    <div class="header">
+        <h3><ul>
+            <li><a href="/">/anomie0xff</a></li>
+            <li><a href="/writeups">/writeups</a></li>
+            <li><a href="/pwn_bootcamp">/pwn_bootcamp</a></li>
+            <li><a href="/pwn_college">/pwn.college</a></li>
+        </ul></h3>
+    </div>
+    <section class="section">
+        <div class="container">
+            
+<h1 class="title">
+  magpieCTF 2023
+</h1>
+
+<div class="page-content">
+<p>Overall a pretty easy CTF so only one writeup this time around. Because of team size restrictions, ret2rev split up, and ret2rev placed 10th while ret3rev placed 8th.</p>
+<h1 id="satshell">Satshell</h1>
+<p>For this challenge we are given a binary and a user manual. Challenge files available <a href="https://anomie0xff.github.io/writeups/magpiectf-2023/satshell.zip">here</a></p>
+<p>Reading provided user manual and running the first command &quot;POSN&quot; on the remote, we see that we need to fix some satellites. We need to make A point to B, B to C, and C to D in order to establish the connetion. Additionally, it explains how the orientation is described, as 3 angles off of the axes.</p>
+<p>Not much rev to actually do here, looking at the binary gives you all the commands you can run, which you can guess the functionality of by running them and seeing their output:</p>
+<ul>
+<li>POSN - prints satellite positions</li>
+<li>STAT:A - prints the orientation of satellite A</li>
+<li>ORNT:A - reads and executes code to reorient satellite A</li>
+<li>CONN - Attempts to spawn a shell. only works if all satellites are correctly oriented</li>
+</ul>
+<p>So the idea is to use POSN and STAT to gather info about the position and orientation of the sattelites, then use ORNT to reorient them using the ISA as described in the PDF. Finally, calling CONN should win if the sattelites are all oriented correctly.</p>
+<p>Back in the user manual, we see which registers we need to interact with, as well as how they are represented in the satellite machine language.</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>$dx = 101
+</span><span>$dy = 110
+</span><span>$dz = 111
+</span></code></pre>
+<p>Additionally, we have the instructions we can use:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>ADDI $rd $rs imm = 00
+</span><span>ORI  $rd $rs imm = 01
+</span><span>SLLI $rd $rs imm = 10
+</span><span>LUI  $rd imm     = 11
+</span></code></pre>
+<p>Looking at the CPU diagram, we can figure out the instruction format is as follows:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>instructions: AABBBCCCDDDDDDDD
+</span><span>AA = ALU Control Operational Value
+</span><span>BBB = $rs
+</span><span>CCC = $rd
+</span><span>DDDDDDDD = imm
+</span></code></pre>
+<p>The final thing is figuring out the math, which after some research and trig review finds this thing called the <a href="https://en.wikipedia.org/wiki/Direction_cosine">direction cosine</a>.</p>
+<p>Now we have all we need to craft the exploit. final solve script below and can also be downloaded <a href="https://anomie0xff.github.io/writeups/magpiectf-2023/solve.py">here</a></p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span style="color:#b48ead;">import </span><span>struct
+</span><span style="color:#b48ead;">import </span><span>math
+</span><span>
+</span><span style="color:#b48ead;">class </span><span style="color:#ebcb8b;">Satellite</span><span style="color:#eff1f5;">:
+</span><span>    </span><span style="color:#b48ead;">def </span><span style="color:#96b5b4;">__init__</span><span>(</span><span style="color:#bf616a;">self</span><span>, </span><span style="color:#bf616a;">l</span><span>):
+</span><span>        </span><span style="color:#bf616a;">self</span><span>.label = l
+</span><span>        </span><span style="color:#bf616a;">self</span><span>.x = </span><span style="color:#d08770;">0
+</span><span>        </span><span style="color:#bf616a;">self</span><span>.y = </span><span style="color:#d08770;">0
+</span><span>        </span><span style="color:#bf616a;">self</span><span>.z = </span><span style="color:#d08770;">0
+</span><span>        </span><span style="color:#bf616a;">self</span><span>.tx = </span><span style="color:#d08770;">0.0
+</span><span>        </span><span style="color:#bf616a;">self</span><span>.ty = </span><span style="color:#d08770;">0.0
+</span><span>        </span><span style="color:#bf616a;">self</span><span>.tz = </span><span style="color:#d08770;">0.0
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">def </span><span style="color:#96b5b4;">__str__</span><span>(</span><span style="color:#bf616a;">self</span><span>):
+</span><span>        </span><span style="color:#b48ead;">return f</span><span>&#39;{</span><span style="color:#bf616a;">self</span><span>.label}</span><span style="color:#a3be8c;"> = [x=</span><span>{</span><span style="color:#bf616a;">self</span><span>.x}</span><span style="color:#a3be8c;">, y=</span><span>{</span><span style="color:#bf616a;">self</span><span>.y}</span><span style="color:#a3be8c;">, z=</span><span>{</span><span style="color:#bf616a;">self</span><span>.z}</span><span style="color:#a3be8c;">, tx=</span><span>{</span><span style="color:#bf616a;">self</span><span>.tx}</span><span style="color:#a3be8c;">, ty=</span><span>{</span><span style="color:#bf616a;">self</span><span>.ty}</span><span style="color:#a3be8c;">, tz=</span><span>{</span><span style="color:#bf616a;">self</span><span>.tz}</span><span style="color:#a3be8c;">]</span><span>&#39;
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">get_sat_states</span><span>(</span><span style="color:#bf616a;">r</span><span>):
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">POSN</span><span>&#39;)
+</span><span>    pos = r.</span><span style="color:#bf616a;">recvuntil</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">awaiting input...</span><span style="color:#96b5b4;">\n</span><span>&#39;).</span><span style="color:#bf616a;">decode</span><span>(&#39;</span><span style="color:#a3be8c;">utf-8</span><span>&#39;).</span><span style="color:#bf616a;">split</span><span>(&#39;</span><span style="color:#96b5b4;">\n</span><span>&#39;)
+</span><span>    </span><span style="color:#b48ead;">for </span><span>i </span><span style="color:#b48ead;">in </span><span>pos:
+</span><span>        </span><span style="color:#96b5b4;">print</span><span>(i)
+</span><span>
+</span><span>    yx_graph = pos[</span><span style="color:#d08770;">3</span><span>:</span><span style="color:#d08770;">15</span><span>]
+</span><span>    </span><span style="color:#b48ead;">for </span><span>i </span><span style="color:#b48ead;">in </span><span style="color:#96b5b4;">range</span><span>(</span><span style="color:#96b5b4;">len</span><span>(yx_graph)):
+</span><span>        yx_graph[i] = yx_graph[i][</span><span style="color:#d08770;">3</span><span>:</span><span style="color:#d08770;">51</span><span>]
+</span><span>        temp = &#39;&#39;
+</span><span>        </span><span style="color:#b48ead;">for </span><span>j </span><span style="color:#b48ead;">in </span><span style="color:#96b5b4;">range</span><span>(</span><span style="color:#d08770;">1</span><span>, </span><span style="color:#96b5b4;">len</span><span>(yx_graph[i]), </span><span style="color:#d08770;">4</span><span>):
+</span><span>            temp += yx_graph[i][j]
+</span><span>        yx_graph[i] = temp
+</span><span>
+</span><span>    </span><span style="color:#65737e;">#print(&#39;yx_graph=&#39;)
+</span><span>    </span><span style="color:#65737e;">#for i in yx_graph:
+</span><span>    </span><span style="color:#65737e;">#    print(i)
+</span><span>    
+</span><span>    yz_graph = pos[</span><span style="color:#d08770;">18</span><span>:</span><span style="color:#d08770;">30</span><span>]
+</span><span>    </span><span style="color:#b48ead;">for </span><span>i </span><span style="color:#b48ead;">in </span><span style="color:#96b5b4;">range</span><span>(</span><span style="color:#96b5b4;">len</span><span>(yz_graph)):
+</span><span>        yz_graph[i] = yz_graph[i][</span><span style="color:#d08770;">3</span><span>:</span><span style="color:#d08770;">51</span><span>]
+</span><span>        temp = &#39;&#39;
+</span><span>        </span><span style="color:#b48ead;">for </span><span>j </span><span style="color:#b48ead;">in </span><span style="color:#96b5b4;">range</span><span>(</span><span style="color:#d08770;">1</span><span>, </span><span style="color:#96b5b4;">len</span><span>(yz_graph[i]), </span><span style="color:#d08770;">4</span><span>):
+</span><span>            temp += yz_graph[i][j]
+</span><span>        yz_graph[i] = temp
+</span><span>    
+</span><span>    </span><span style="color:#65737e;">#print(&#39;yz_graph=&#39;)
+</span><span>    </span><span style="color:#65737e;">#for i in yz_graph:
+</span><span>    </span><span style="color:#65737e;">#    print(i)
+</span><span>
+</span><span>    A = </span><span style="color:#bf616a;">Satellite</span><span>(&#39;</span><span style="color:#a3be8c;">A</span><span>&#39;)
+</span><span>    B = </span><span style="color:#bf616a;">Satellite</span><span>(&#39;</span><span style="color:#a3be8c;">B</span><span>&#39;)
+</span><span>    C = </span><span style="color:#bf616a;">Satellite</span><span>(&#39;</span><span style="color:#a3be8c;">C</span><span>&#39;)
+</span><span>    D = </span><span style="color:#bf616a;">Satellite</span><span>(&#39;</span><span style="color:#a3be8c;">D</span><span>&#39;)
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">for </span><span>i,l </span><span style="color:#b48ead;">in </span><span style="color:#96b5b4;">enumerate</span><span>(yx_graph):
+</span><span>        </span><span style="color:#b48ead;">if </span><span>&#39;</span><span style="color:#a3be8c;">A</span><span>&#39; in l:
+</span><span>            A.y = </span><span style="color:#d08770;">11</span><span>-i
+</span><span>            A.x = l.</span><span style="color:#bf616a;">index</span><span>(&#39;</span><span style="color:#a3be8c;">A</span><span>&#39;)
+</span><span>        </span><span style="color:#b48ead;">if </span><span>&#39;</span><span style="color:#a3be8c;">B</span><span>&#39; in l:
+</span><span>            B.y = </span><span style="color:#d08770;">11</span><span>-i
+</span><span>            B.x = l.</span><span style="color:#bf616a;">index</span><span>(&#39;</span><span style="color:#a3be8c;">B</span><span>&#39;)
+</span><span>        </span><span style="color:#b48ead;">if </span><span>&#39;</span><span style="color:#a3be8c;">C</span><span>&#39; in l:
+</span><span>            C.y = </span><span style="color:#d08770;">11</span><span>-i
+</span><span>            C.x = l.</span><span style="color:#bf616a;">index</span><span>(&#39;</span><span style="color:#a3be8c;">C</span><span>&#39;)
+</span><span>        </span><span style="color:#b48ead;">if </span><span>&#39;</span><span style="color:#a3be8c;">D</span><span>&#39; in l:
+</span><span>            D.y = </span><span style="color:#d08770;">11</span><span>-i
+</span><span>            D.x = l.</span><span style="color:#bf616a;">index</span><span>(&#39;</span><span style="color:#a3be8c;">D</span><span>&#39;)
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">for </span><span>l </span><span style="color:#b48ead;">in </span><span>yz_graph:
+</span><span>        </span><span style="color:#b48ead;">if </span><span>&#39;</span><span style="color:#a3be8c;">A</span><span>&#39; in l:
+</span><span>            A.z = l.</span><span style="color:#bf616a;">index</span><span>(&#39;</span><span style="color:#a3be8c;">A</span><span>&#39;)
+</span><span>        </span><span style="color:#b48ead;">if </span><span>&#39;</span><span style="color:#a3be8c;">B</span><span>&#39; in l:
+</span><span>            B.z = l.</span><span style="color:#bf616a;">index</span><span>(&#39;</span><span style="color:#a3be8c;">B</span><span>&#39;)
+</span><span>        </span><span style="color:#b48ead;">if </span><span>&#39;</span><span style="color:#a3be8c;">C</span><span>&#39; in l:
+</span><span>            C.z = l.</span><span style="color:#bf616a;">index</span><span>(&#39;</span><span style="color:#a3be8c;">C</span><span>&#39;)
+</span><span>        </span><span style="color:#b48ead;">if </span><span>&#39;</span><span style="color:#a3be8c;">D</span><span>&#39; in l:
+</span><span>            D.z = l.</span><span style="color:#bf616a;">index</span><span>(&#39;</span><span style="color:#a3be8c;">D</span><span>&#39;)
+</span><span>    
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">STAT:A</span><span>&#39;)
+</span><span>    a_info = r.</span><span style="color:#bf616a;">recvuntil</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">awaiting input...</span><span style="color:#96b5b4;">\n</span><span>&#39;).</span><span style="color:#bf616a;">decode</span><span>(&#39;</span><span style="color:#a3be8c;">utf-8</span><span>&#39;).</span><span style="color:#bf616a;">split</span><span>(&#39;</span><span style="color:#96b5b4;">\n</span><span>&#39;)[-</span><span style="color:#d08770;">3</span><span>].</span><span style="color:#bf616a;">split</span><span>(&#39; &#39;)
+</span><span>    A.tx = </span><span style="color:#bf616a;">float</span><span>(a_info[</span><span style="color:#d08770;">1</span><span>][:a_info[</span><span style="color:#d08770;">1</span><span>].</span><span style="color:#bf616a;">index</span><span>(&#39;</span><span style="color:#a3be8c;">d</span><span>&#39;)])
+</span><span>    A.ty = </span><span style="color:#bf616a;">float</span><span>(a_info[</span><span style="color:#d08770;">3</span><span>][:a_info[</span><span style="color:#d08770;">3</span><span>].</span><span style="color:#bf616a;">index</span><span>(&#39;</span><span style="color:#a3be8c;">d</span><span>&#39;)])
+</span><span>    A.tz = </span><span style="color:#bf616a;">float</span><span>(a_info[</span><span style="color:#d08770;">5</span><span>][:a_info[</span><span style="color:#d08770;">5</span><span>].</span><span style="color:#bf616a;">index</span><span>(&#39;</span><span style="color:#a3be8c;">d</span><span>&#39;)])
+</span><span>
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">STAT:B</span><span>&#39;)
+</span><span>    b_info = r.</span><span style="color:#bf616a;">recvuntil</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">awaiting input...</span><span style="color:#96b5b4;">\n</span><span>&#39;).</span><span style="color:#bf616a;">decode</span><span>(&#39;</span><span style="color:#a3be8c;">utf-8</span><span>&#39;).</span><span style="color:#bf616a;">split</span><span>(&#39;</span><span style="color:#96b5b4;">\n</span><span>&#39;)[-</span><span style="color:#d08770;">3</span><span>].</span><span style="color:#bf616a;">split</span><span>(&#39; &#39;)
+</span><span>    B.tx = </span><span style="color:#bf616a;">float</span><span>(b_info[</span><span style="color:#d08770;">1</span><span>][:b_info[</span><span style="color:#d08770;">1</span><span>].</span><span style="color:#bf616a;">index</span><span>(&#39;</span><span style="color:#a3be8c;">d</span><span>&#39;)])
+</span><span>    B.ty = </span><span style="color:#bf616a;">float</span><span>(b_info[</span><span style="color:#d08770;">3</span><span>][:b_info[</span><span style="color:#d08770;">3</span><span>].</span><span style="color:#bf616a;">index</span><span>(&#39;</span><span style="color:#a3be8c;">d</span><span>&#39;)])
+</span><span>    B.tz = </span><span style="color:#bf616a;">float</span><span>(b_info[</span><span style="color:#d08770;">5</span><span>][:b_info[</span><span style="color:#d08770;">5</span><span>].</span><span style="color:#bf616a;">index</span><span>(&#39;</span><span style="color:#a3be8c;">d</span><span>&#39;)])
+</span><span>
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">STAT:C</span><span>&#39;)
+</span><span>    c_info = r.</span><span style="color:#bf616a;">recvuntil</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">awaiting input...</span><span style="color:#96b5b4;">\n</span><span>&#39;).</span><span style="color:#bf616a;">decode</span><span>(&#39;</span><span style="color:#a3be8c;">utf-8</span><span>&#39;).</span><span style="color:#bf616a;">split</span><span>(&#39;</span><span style="color:#96b5b4;">\n</span><span>&#39;)[-</span><span style="color:#d08770;">3</span><span>].</span><span style="color:#bf616a;">split</span><span>(&#39; &#39;)
+</span><span>    C.tx = </span><span style="color:#bf616a;">float</span><span>(c_info[</span><span style="color:#d08770;">1</span><span>][:c_info[</span><span style="color:#d08770;">1</span><span>].</span><span style="color:#bf616a;">index</span><span>(&#39;</span><span style="color:#a3be8c;">d</span><span>&#39;)])
+</span><span>    C.ty = </span><span style="color:#bf616a;">float</span><span>(c_info[</span><span style="color:#d08770;">3</span><span>][:c_info[</span><span style="color:#d08770;">3</span><span>].</span><span style="color:#bf616a;">index</span><span>(&#39;</span><span style="color:#a3be8c;">d</span><span>&#39;)])
+</span><span>    C.tz = </span><span style="color:#bf616a;">float</span><span>(c_info[</span><span style="color:#d08770;">5</span><span>][:c_info[</span><span style="color:#d08770;">5</span><span>].</span><span style="color:#bf616a;">index</span><span>(&#39;</span><span style="color:#a3be8c;">d</span><span>&#39;)])
+</span><span>
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(A)
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(B)
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(C)
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(D)
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">return </span><span>(A, B, C, D)
+</span><span>
+</span><span>
+</span><span style="color:#65737e;"># orient V to point to U
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">orient</span><span>(</span><span style="color:#bf616a;">r</span><span>, </span><span style="color:#bf616a;">V</span><span>, </span><span style="color:#bf616a;">U</span><span>):
+</span><span>    </span><span style="color:#65737e;"># instructions: AABBBCCCDDDDDDDD
+</span><span>    </span><span style="color:#65737e;"># AA = ALU Control Operational Value
+</span><span>    </span><span style="color:#65737e;"># BBB = $rs
+</span><span>    </span><span style="color:#65737e;"># CCC = $rd
+</span><span>    </span><span style="color:#65737e;"># DDDDDDDD = imm
+</span><span>
+</span><span>    dx = &#39;</span><span style="color:#a3be8c;">101</span><span>&#39;
+</span><span>    dy = &#39;</span><span style="color:#a3be8c;">110</span><span>&#39;
+</span><span>    dz = &#39;</span><span style="color:#a3be8c;">111</span><span>&#39;
+</span><span>
+</span><span>    opADD = &#39;</span><span style="color:#a3be8c;">00</span><span>&#39; </span><span style="color:#65737e;"># ADDI $rd $rs imm
+</span><span>    opOR  = &#39;</span><span style="color:#a3be8c;">01</span><span>&#39; </span><span style="color:#65737e;"># ORI  $rd $rs imm
+</span><span>    opSLL = &#39;</span><span style="color:#a3be8c;">10</span><span>&#39; </span><span style="color:#65737e;"># SLLI $rd $rs imm
+</span><span>    opLUI = &#39;</span><span style="color:#a3be8c;">11</span><span>&#39; </span><span style="color:#65737e;"># LUI  $rd imm
+</span><span>
+</span><span>
+</span><span>    </span><span style="color:#65737e;"># x = |v| * cos(a)
+</span><span>    </span><span style="color:#65737e;"># a = arccos(x/|v|)
+</span><span>    mag = math.</span><span style="color:#bf616a;">sqrt</span><span>(</span><span style="color:#96b5b4;">pow</span><span>(V.x-U.x, </span><span style="color:#d08770;">2</span><span>) + </span><span style="color:#96b5b4;">pow</span><span>(V.y-U.y, </span><span style="color:#d08770;">2</span><span>) + </span><span style="color:#96b5b4;">pow</span><span>(V.z-U.z, </span><span style="color:#d08770;">2</span><span>))
+</span><span>
+</span><span>    
+</span><span>
+</span><span>    targetx = math.</span><span style="color:#bf616a;">degrees</span><span>(math.</span><span style="color:#bf616a;">acos</span><span>(</span><span style="color:#96b5b4;">abs</span><span>(V.x-U.x) / mag))
+</span><span>    targety = math.</span><span style="color:#bf616a;">degrees</span><span>(math.</span><span style="color:#bf616a;">acos</span><span>(</span><span style="color:#96b5b4;">abs</span><span>(V.y-U.y) / mag))
+</span><span>    targetz = math.</span><span style="color:#bf616a;">degrees</span><span>(math.</span><span style="color:#bf616a;">acos</span><span>(</span><span style="color:#96b5b4;">abs</span><span>(V.z-U.z) / mag))
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">if </span><span>U.x &lt; V.x:
+</span><span>        targetx = </span><span style="color:#d08770;">180 </span><span>- targetx
+</span><span>    </span><span style="color:#b48ead;">if </span><span>U.y &lt; V.y:
+</span><span>        targety = </span><span style="color:#d08770;">180 </span><span>- targety
+</span><span>    </span><span style="color:#b48ead;">if </span><span>U.z &lt; V.z:
+</span><span>        targetz = </span><span style="color:#d08770;">180 </span><span>- targetz
+</span><span>
+</span><span>
+</span><span>    deltax = struct.</span><span style="color:#bf616a;">pack</span><span>(&#39;</span><span style="color:#a3be8c;">&gt;e</span><span>&#39;, targetx - V.tx)
+</span><span>    deltay = struct.</span><span style="color:#bf616a;">pack</span><span>(&#39;</span><span style="color:#a3be8c;">&gt;e</span><span>&#39;, targety - V.ty)
+</span><span>    deltaz = struct.</span><span style="color:#bf616a;">pack</span><span>(&#39;</span><span style="color:#a3be8c;">&gt;e</span><span>&#39;, targetz - V.tz)
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(</span><span style="color:#b48ead;">f</span><span>&#39;</span><span style="color:#a3be8c;">Targets for </span><span>{V.label}</span><span style="color:#a3be8c;">:</span><span>&#39;)
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(targetx)
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(targety)
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(targetz)
+</span><span>
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">f</span><span>&#39;</span><span style="color:#a3be8c;">ORNT:</span><span>{V.label}&#39;)
+</span><span>    code = </span><span style="color:#bf616a;">int</span><span>(opLUI + dx + dx, </span><span style="color:#d08770;">2</span><span>).</span><span style="color:#bf616a;">to_bytes</span><span>(</span><span style="color:#d08770;">1</span><span>, </span><span style="color:#bf616a;">byteorder</span><span>=&#39;</span><span style="color:#a3be8c;">big</span><span>&#39;) + deltax[</span><span style="color:#d08770;">0</span><span>:</span><span style="color:#d08770;">1</span><span>]
+</span><span>    code += </span><span style="color:#bf616a;">int</span><span>(opADD + dx + dx, </span><span style="color:#d08770;">2</span><span>).</span><span style="color:#bf616a;">to_bytes</span><span>(</span><span style="color:#d08770;">1</span><span>, </span><span style="color:#bf616a;">byteorder</span><span>=&#39;</span><span style="color:#a3be8c;">big</span><span>&#39;) + deltax[</span><span style="color:#d08770;">1</span><span>:</span><span style="color:#d08770;">2</span><span>]
+</span><span>    code += </span><span style="color:#bf616a;">int</span><span>(opLUI + dy + dy, </span><span style="color:#d08770;">2</span><span>).</span><span style="color:#bf616a;">to_bytes</span><span>(</span><span style="color:#d08770;">1</span><span>, </span><span style="color:#bf616a;">byteorder</span><span>=&#39;</span><span style="color:#a3be8c;">big</span><span>&#39;) + deltay[</span><span style="color:#d08770;">0</span><span>:</span><span style="color:#d08770;">1</span><span>]
+</span><span>    code += </span><span style="color:#bf616a;">int</span><span>(opADD + dy + dy, </span><span style="color:#d08770;">2</span><span>).</span><span style="color:#bf616a;">to_bytes</span><span>(</span><span style="color:#d08770;">1</span><span>, </span><span style="color:#bf616a;">byteorder</span><span>=&#39;</span><span style="color:#a3be8c;">big</span><span>&#39;) + deltay[</span><span style="color:#d08770;">1</span><span>:</span><span style="color:#d08770;">2</span><span>]
+</span><span>    code += </span><span style="color:#bf616a;">int</span><span>(opLUI + dz + dz, </span><span style="color:#d08770;">2</span><span>).</span><span style="color:#bf616a;">to_bytes</span><span>(</span><span style="color:#d08770;">1</span><span>, </span><span style="color:#bf616a;">byteorder</span><span>=&#39;</span><span style="color:#a3be8c;">big</span><span>&#39;) + deltaz[</span><span style="color:#d08770;">0</span><span>:</span><span style="color:#d08770;">1</span><span>]
+</span><span>    code += </span><span style="color:#bf616a;">int</span><span>(opADD + dz + dz, </span><span style="color:#d08770;">2</span><span>).</span><span style="color:#bf616a;">to_bytes</span><span>(</span><span style="color:#d08770;">1</span><span>, </span><span style="color:#bf616a;">byteorder</span><span>=&#39;</span><span style="color:#a3be8c;">big</span><span>&#39;) + deltaz[</span><span style="color:#d08770;">1</span><span>:</span><span style="color:#d08770;">2</span><span>]
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(code)
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(r.</span><span style="color:#bf616a;">recvuntil</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">awaiting input...</span><span style="color:#96b5b4;">\n</span><span>&#39;).</span><span style="color:#bf616a;">decode</span><span>(&#39;</span><span style="color:#a3be8c;">utf-8</span><span>&#39;))
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    r = </span><span style="color:#bf616a;">remote</span><span>(&quot;</span><span style="color:#a3be8c;">srv2.2023.magpiectf.ca</span><span>&quot;, </span><span style="color:#d08770;">31185</span><span>)
+</span><span>    r.</span><span style="color:#bf616a;">recvuntil</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">awaiting input...</span><span style="color:#96b5b4;">\n</span><span>&#39;)
+</span><span>    
+</span><span>    (A, B, C, D) = </span><span style="color:#bf616a;">get_sat_states</span><span>(r)
+</span><span>
+</span><span>    </span><span style="color:#bf616a;">orient</span><span>(r, A, B)
+</span><span>    </span><span style="color:#bf616a;">orient</span><span>(r, B, C)
+</span><span>    </span><span style="color:#bf616a;">orient</span><span>(r, C, D)
+</span><span>
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">CONN</span><span>&#39;)
+</span><span>
+</span><span>    r.</span><span style="color:#bf616a;">interactive</span><span>()
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">if </span><span>__name__ == &quot;</span><span style="color:#a3be8c;">__main__</span><span>&quot;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span></code></pre>
+
+</div>
+
+        </div>
+    </section>
+</body>
+
+</html>

